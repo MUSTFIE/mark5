@@ -3516,6 +3516,10 @@ function applyDataPayload(data) {
     ? { ...DEFAULT_RATES, ...data.rates, MOP: 1 }
     : { ...DEFAULT_RATES };
   budget = normalizeBudget(data.budget);
+  // 雲端／匯入套用後必須清月份快取，否則畫面仍顯示舊列表
+  if (typeof invalidateMonthRecCache === 'function') {
+    try { invalidateMonthRecCache(); } catch (_) {}
+  }
 }
 
 function loadGuestDataIntoMemory() {
@@ -3546,6 +3550,9 @@ function loadGuestDataIntoMemory() {
   const p = loadJSONRaw(RATES_KEY, null);
   rates = p ? { ...DEFAULT_RATES, ...p, MOP: 1 } : { ...DEFAULT_RATES };
   budget = normalizeBudget(loadJSONRaw(BUDGET_KEY, { amount: 0, categories: [] }));
+  if (typeof invalidateMonthRecCache === 'function') {
+    try { invalidateMonthRecCache(); } catch (_) {}
+  }
 }
 
 function persistLocal(sync = true) {
@@ -3671,6 +3678,9 @@ function attachCloudListeners(uid) {
     }
 
     persistLocal(false);
+    if (typeof invalidateMonthRecCache === 'function') {
+      try { invalidateMonthRecCache(); } catch (_) {}
+    }
     if (isFirst && typeof accrueDailyInterest === 'function') {
       try { accrueDailyInterest(); } catch (e) { console.error(e); }
     }
@@ -3678,7 +3688,12 @@ function attachCloudListeners(uid) {
     if (isFirst) {
       toast('已載入帳戶資料（即時同步已啟用）', 'ok');
     }
-    if (typeof switchPage === 'function') switchPage(currentPage);
+    // 強制重繪目前頁面（勿依賴舊月份快取）
+    try {
+      const page = (typeof currentPage === 'string' && currentPage) ? currentPage : 'monthly';
+      if (typeof switchPage === 'function') switchPage(page);
+      else if (page === 'monthly' && typeof renderMonthly === 'function') renderMonthly();
+    } catch (e) { console.error('重繪失敗', e); }
   }, (err) => {
     console.error('雲端監聽錯誤', err);
     setSyncStatus('err', err.message || String(err));
@@ -3703,8 +3718,29 @@ async function onUserSignedIn(user) {
   _lastCloudUpdatedAt = 0;
   _suppressCloudApply = false;
 
+  // currentUser 已設定 → scopedKey 會用 uid；先載入本機帳號快取，畫面立刻有資料
+  try {
+    const localRec = loadJSON(STORAGE_KEY, null);
+    const localAcc = loadJSON(ACCOUNTS_KEY, null);
+    const localLiab = loadJSON(LIABILITIES_KEY, null);
+    const localMpf = loadJSON(MPF_KEY, null);
+    const localRates = loadJSON(RATES_KEY, null);
+    const localBudget = loadJSON(BUDGET_KEY, null);
+    if (localRec || localAcc || localMpf || localLiab) {
+      applyDataPayload({
+        records: localRec || [],
+        accounts: localAcc || [],
+        liabilities: localLiab || [],
+        mpfData: localMpf || { accounts: [] },
+        rates: localRates ? { ...DEFAULT_RATES, ...localRates, MOP: 1 } : { ...DEFAULT_RATES },
+        budget: localBudget || { amount: 0, categories: [] }
+      });
+      if (typeof switchPage === 'function') switchPage(currentPage || 'monthly');
+    }
+  } catch (e) { console.error('載入本機帳號快取失敗', e); }
+
   setSyncStatus('syncing');
-  // 即時監聽：首次 value 會載入資料並啟用持續同步
+  // 即時監聽：首次 value 會以雲端資料覆寫並啟用持續同步
   try {
     attachCloudListeners(user.uid);
   } catch (err) {
