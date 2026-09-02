@@ -429,6 +429,36 @@ form { padding: 14px 18px 20px; }
 .amount-row select { width: 96px; flex-shrink: 0; }
 .amount-row input { flex: 1; }
 .type-toggle { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 記帳表單：類型改為橫向滑動選取（手機友善） */
+#record-form .type-toggle,
+.entry-type-row.type-toggle,
+.form-row.entry-type-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  margin-left: -2px;
+  margin-right: -2px;
+  padding-left: 2px;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+#record-form .type-toggle::-webkit-scrollbar,
+.entry-type-row.type-toggle::-webkit-scrollbar,
+.form-row.entry-type-row::-webkit-scrollbar { display: none; }
+#record-form .type-btn,
+.entry-type-row .type-btn,
+.form-row.entry-type-row .type-btn {
+  flex: 0 0 auto;
+  min-width: 4.6em;
+  min-height: 40px;
+  padding: 8px 14px;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
 .type-btn {
   flex: 1 1 calc(33.33% - 8px); min-height: 40px; padding: 8px 6px;
   border: 1px solid var(--border); border-radius: 12px;
@@ -1136,6 +1166,197 @@ form { padding: 14px 18px 20px; }
   #accounts-other-list.accounts-grid,
   #mpf-accounts-list.accounts-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== 本月 vs 上月 ===== */
+.mom-compare {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.mom-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.mom-card .mom-label {
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.mom-card .mom-val {
+  font-size: 0.88rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+.mom-card .mom-delta {
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.mom-card .mom-delta.up { color: var(--expense); }
+.mom-card .mom-delta.down { color: var(--income); }
+.mom-card .mom-delta.flat { color: var(--muted); }
+.mom-card.mom-income .mom-delta.up { color: var(--income); }
+.mom-card.mom-income .mom-delta.down { color: var(--expense); }
+@media (max-width: 400px) {
+  .mom-compare { grid-template-columns: 1fr; }
+  .mom-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; padding: 10px 12px; }
+  .mom-card .mom-val { margin-bottom: 0; }
+}
+
+/* ===== 常用模板 ===== */
+.templates-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.templates-bar .tpl-label {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.tpl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--input-bg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  transition: all .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tpl-chip:active { transform: scale(0.96); }
+.tpl-chip:hover {
+  border-color: rgba(79, 70, 229, 0.4);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.tpl-chip .tpl-amt {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+.tpl-manage {
+  border-style: dashed;
+  color: var(--primary);
+}
+
+/* ===== 存錢目標：小豬進度 ===== */
+.goal-visual {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 4px;
+}
+.piggy-wrap {
+  position: relative;
+  width: 56px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.piggy-svg { width: 56px; height: 56px; display: block; }
+.piggy-wrap .piggy-pct {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+.piggy-wrap.done .piggy-pct { color: var(--income); }
+.goal-bar { flex: 1; min-width: 0; }
+.goal-card.done-card {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(160deg, rgba(16, 185, 129, 0.08), transparent);
+}
+@keyframes pig-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.piggy-wrap.done .piggy-svg { animation: pig-bounce 0.8s ease infinite; }
+
+/* ===== 深色模式 ===== */
+[data-theme="dark"] {
+  --bg: #0B1220;
+  --card: #141B2D;
+  --text: #E2E8F0;
+  --muted: #94A3B8;
+  --border: rgba(148, 163, 184, 0.14);
+  --separator: rgba(148, 163, 184, 0.18);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --primary-soft: rgba(99, 102, 241, 0.18);
+  --fill: rgba(148, 163, 184, 0.12);
+  --fill2: rgba(148, 163, 184, 0.16);
+  --fill3: rgba(148, 163, 184, 0.22);
+  --system-gray6: #1E293B;
+  --input-bg: #1E293B;
+  --surface: rgba(20, 27, 45, 0.92);
+  --grad-hero: linear-gradient(145deg, #1E1B4B 0%, #172554 45%, #1E293B 100%);
+}
+[data-theme="dark"] body {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(99, 102, 241, 0.14), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(124, 58, 237, 0.10), transparent 50%),
+    var(--bg);
+}
+[data-theme="dark"] .btn {
+  background: rgba(30, 41, 59, 0.9);
+  color: #A5B4FC;
+}
+[data-theme="dark"] .btn:hover { background: #1E293B; }
+[data-theme="dark"] .bottom-nav {
+  background: rgba(15, 23, 42, 0.88) !important;
+  border-top-color: rgba(148, 163, 184, 0.12) !important;
+}
+[data-theme="dark"] .sub-tab.active { background: #1E293B !important; color: #A5B4FC !important; }
+[data-theme="dark"] .day-group.day-alt-0 { background: var(--card); }
+[data-theme="dark"] .day-group.day-alt-1 { background: rgba(99, 102, 241, 0.08); }
+[data-theme="dark"] .day-group-body .record-item { background: rgba(30, 41, 59, 0.7); }
+[data-theme="dark"] .type-group { background: #0F172A; }
+[data-theme="dark"] .type-group-toggle { background: #1E293B; }
+[data-theme="dark"] .month-stat { background: #1E293B; }
+[data-theme="dark"] .currency-chip { background: #1E293B; }
+[data-theme="dark"] .modal { background: var(--card); }
+[data-theme="dark"] .modal-header { background: var(--card); }
+[data-theme="dark"] .filter-panel { background: #1E293B; }
+[data-theme="dark"] .settings-menu-item:hover { background: rgba(99, 102, 241, 0.12); }
+[data-theme="dark"] .offline-banner {
+  background: #422006; color: #FDBA74; border-color: #9A3412;
+}
+[data-theme="dark"] .export-btn.danger { background: #450A0A; border-color: #7F1D1D; }
+[data-theme="dark"] .btn.danger-outline { background: #450A0A; border-color: #7F1D1D; }
+[data-theme="dark"] header h1 {
+  background: linear-gradient(120deg, #E2E8F0 0%, #94A3B8 100%);
+  -webkit-background-clip: text; background-clip: text;
+}
+[data-theme="dark"] .goal-card { background: #1E293B; }
+[data-theme="dark"] .goal-card.done-card {
+  background: linear-gradient(160deg, rgba(16, 185, 129, 0.12), #1E293B);
+}
+[data-theme="dark"] .bar-track { background: rgba(148, 163, 184, 0.15); }
+[data-theme="dark"] .record-item { border-bottom-color: rgba(148, 163, 184, 0.1); }
+[data-theme="dark"] .month-table th, [data-theme="dark"] .month-table td {
+  border-bottom-color: rgba(148, 163, 184, 0.1);
+}
+[data-theme="dark"] .month-table tbody tr.month-table-total { background: #1E293B; }
 </style>
 </head>
 <body>
@@ -1187,6 +1408,7 @@ form { padding: 14px 18px 20px; }
  <div class="page-actions">
  <button type="button" id="btn-add" class="btn primary">＋ 新增</button>
  </div>
+ <div id="templates-bar" class="templates-bar" aria-label="常用紀錄"></div>
  <div class="stack-col">
  <section class="records-section">
  <div class="section-header">
@@ -1252,6 +1474,7 @@ form { padding: 14px 18px 20px; }
  <div class="value" id="analysis-month-consumption">MOP 0</div>
  </div>
  </div>
+ <div id="mom-compare" class="mom-compare" aria-label="本月與上月對比"></div>
  <section class="chart-section">
  <h3>本月消費支出分類</h3>
  <div id="categoryDonut" class="donut-wrap"></div>
@@ -1533,7 +1756,76 @@ form { padding: 14px 18px 20px; }
  <div class="settings-menu">
  <button type="button" id="btn-settings-export" class="settings-menu-item">⬇　匯出 / 備份</button>
  <button type="button" id="btn-settings-rates" class="settings-menu-item">💱　匯率設定</button>
+ <button type="button" id="btn-settings-templates" class="settings-menu-item">⚡　常用模板</button>
+ <button type="button" id="btn-toggle-theme" class="settings-menu-item">🌙　深色模式</button>
  </div>
+ </div>
+ </div>
+
+ <!-- 常用模板管理 -->
+ <div id="templates-modal-overlay" class="modal-overlay hidden">
+ <div class="modal modal-sheet">
+ <div class="modal-header">
+ <h3>常用模板</h3>
+ <button type="button" id="btn-close-templates" class="btn-icon">×</button>
+ </div>
+ <div class="account-detail-body">
+ <p class="field-hint" style="margin-bottom:10px">點選模板可快速帶入記帳表單；可新增每月固定支出／收入。</p>
+ <div id="templates-manage-list" class="goal-list"></div>
+ <div id="no-templates" class="empty-hint">尚未設定模板</div>
+ <button type="button" id="btn-add-template" class="btn primary" style="width:100%;margin-top:12px">＋ 新增模板</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 新增／編輯模板 -->
+ <div id="template-edit-overlay" class="modal-overlay hidden">
+ <div class="modal">
+ <div class="modal-header">
+ <h3 id="template-edit-title">新增模板</h3>
+ <button type="button" id="btn-close-template-edit" class="btn-icon">×</button>
+ </div>
+ <form id="template-edit-form">
+ <input type="hidden" id="tpl-edit-id">
+ <div class="form-row">
+ <label for="tpl-name">顯示名稱</label>
+ <input type="text" id="tpl-name" placeholder="例如：租金、Netflix" required>
+ </div>
+ <div class="form-row">
+ <label>類型</label>
+ <div class="type-toggle">
+ <button type="button" class="type-btn active" data-tpl-type="expense">支出</button>
+ <button type="button" class="type-btn" data-tpl-type="income">收入</button>
+ </div>
+ </div>
+ <div class="form-row">
+ <label for="tpl-amount">金額</label>
+ <div class="amount-row">
+ <select id="tpl-currency">
+ <option value="MOP">MOP</option>
+ <option value="HKD">HKD</option>
+ <option value="CNY">CNY</option>
+ </select>
+ <input type="number" id="tpl-amount" min="0" step="0.01" placeholder="0" required>
+ </div>
+ </div>
+ <div class="form-row">
+ <label for="tpl-category">分類</label>
+ <select id="tpl-category"></select>
+ </div>
+ <div class="form-row">
+ <label for="tpl-account">預設戶口（選填）</label>
+ <select id="tpl-account"><option value="">不指定</option></select>
+ </div>
+ <div class="form-row">
+ <label for="tpl-note">備註</label>
+ <input type="text" id="tpl-note" placeholder="選填">
+ </div>
+ <div class="form-actions">
+ <button type="button" id="btn-cancel-template-edit" class="btn">取消</button>
+ <button type="submit" class="btn primary">儲存</button>
+ </div>
+ </form>
  </div>
  </div>
 
@@ -2437,6 +2729,276 @@ function setPref(k, v) {
   savePrefs(p);
 }
 
+/* ===== 深色模式 ===== */
+function applyTheme(theme) {
+  const t = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  try {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = t === 'dark' ? '#0B1220' : '#4F46E5';
+  } catch (_) {}
+  const btn = document.getElementById('btn-toggle-theme');
+  if (btn) btn.textContent = t === 'dark' ? '☀️　淺色模式' : '🌙　深色模式';
+}
+function initTheme() {
+  let theme = getPref('theme', '');
+  if (!theme && window.matchMedia) {
+    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  applyTheme(theme || 'light');
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  setPref('theme', next);
+  applyTheme(next);
+  toast(next === 'dark' ? '已切換深色模式' : '已切換淺色模式', 'ok');
+}
+
+/* ===== 常用模板 ===== */
+const TEMPLATES_KEY = 'accounting_templates_v1';
+const DEFAULT_TEMPLATES = [
+  { id: 'tpl_rent', name: '租金', type: 'expense', amount: 0, currency: 'MOP', category: '居住', note: '月租' },
+  { id: 'tpl_sub', name: '訂閱', type: 'expense', amount: 0, currency: 'MOP', category: '娛樂', note: '訂閱服務' },
+  { id: 'tpl_salary', name: '薪資', type: 'income', amount: 0, currency: 'MOP', category: '薪資', note: '月薪' }
+];
+function loadTemplates() {
+  const list = loadJSON(TEMPLATES_KEY, null);
+  if (Array.isArray(list) && list.length) return list;
+  return DEFAULT_TEMPLATES.map(t => ({ ...t }));
+}
+function saveTemplates(list) {
+  // 本機偏好，不推雲端全量同步
+  writeLocalOnly(TEMPLATES_KEY, list);
+}
+let templates = []; // init() 時再 loadTemplates()
+
+function renderTemplatesBar() {
+  const bar = document.getElementById('templates-bar');
+  if (!bar) return;
+  if (!templates.length) {
+    bar.innerHTML = `<span class="tpl-label">常用</span>
+      <button type="button" class="tpl-chip tpl-manage" id="btn-tpl-manage-inline">＋ 管理模板</button>`;
+  } else {
+    bar.innerHTML = `<span class="tpl-label">常用</span>` +
+      templates.slice(0, 8).map(t => {
+        const amt = Number(t.amount) || 0;
+        const amtStr = amt > 0 ? `<span class="tpl-amt">${t.currency || 'MOP'} ${formatMoney(amt)}</span>` : '';
+        return `<button type="button" class="tpl-chip" data-tpl-id="${escapeHtml(t.id)}">${escapeHtml(t.name)}${amtStr}</button>`;
+      }).join('') +
+      `<button type="button" class="tpl-chip tpl-manage" id="btn-tpl-manage-inline">管理</button>`;
+  }
+  bar.querySelectorAll('.tpl-chip[data-tpl-id]').forEach(btn => {
+    btn.addEventListener('click', () => applyTemplate(btn.dataset.tplId));
+  });
+  bar.querySelector('#btn-tpl-manage-inline')?.addEventListener('click', openTemplatesModal);
+}
+
+function applyTemplate(id) {
+  const t = templates.find(x => x.id === id);
+  if (!t) return;
+  if (!accounts.length) {
+    toast('請先到資產頁新增戶口', 'err');
+    switchPage('assets');
+    return;
+  }
+  openAddModal();
+  currentType = t.type === 'income' ? 'income' : 'expense';
+  $$('#record-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
+  if (t.amount > 0) $('#amount').value = t.amount;
+  if (t.currency) $('#currency').value = t.currency;
+  const preset = CATEGORIES.map(c => c.name);
+  if (preset.includes(t.category)) {
+    $('#category').value = t.category;
+    $('#custom-category-row')?.classList.add('hidden');
+  } else if (t.category) {
+    $('#category').value = '其他';
+    $('#custom-category-row')?.classList.remove('hidden');
+    if ($('#custom-category')) $('#custom-category').value = t.category;
+  }
+  onCategoryChange?.();
+  if (t.accountId) populateAccountSelect(t.accountId);
+  if (t.note && $('#note')) $('#note').value = t.note;
+  if ($('#advance-toggle-row')) $('#advance-toggle-row').classList.toggle('hidden', currentType === 'income');
+  setTimeout(() => { const a = $('#amount'); if (a) a.focus(); }, 120);
+  toast(`已套用「${t.name}」`, 'ok');
+}
+
+function openTemplatesModal() {
+  renderTemplatesManageList();
+  $('#templates-modal-overlay')?.classList.remove('hidden');
+}
+function closeTemplatesModal() {
+  $('#templates-modal-overlay')?.classList.add('hidden');
+}
+function renderTemplatesManageList() {
+  const box = $('#templates-manage-list');
+  const empty = $('#no-templates');
+  if (!box) return;
+  if (!templates.length) {
+    box.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  box.innerHTML = templates.map(t => {
+    const icon = t.type === 'income' ? '💰' : '🧾';
+    const amt = Number(t.amount) || 0;
+    return `<div class="goal-card">
+      <div class="goal-card-header">
+        <div>
+          <div class="goal-card-name">${icon} ${escapeHtml(t.name)}</div>
+          <div class="goal-card-meta">${t.type === 'income' ? '收入' : '支出'} · ${escapeHtml(t.category || '')}${amt ? ' · ' + money(t.currency || 'MOP', amt) : ''}${t.note ? ' · ' + escapeHtml(t.note) : ''}</div>
+        </div>
+        <div class="goal-card-actions">
+          <button type="button" class="edit-tpl" data-id="${t.id}">編輯</button>
+          <button type="button" class="delete delete-tpl" data-id="${t.id}">刪除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.edit-tpl').forEach(btn => btn.addEventListener('click', () => openTemplateEditModal(btn.dataset.id)));
+  box.querySelectorAll('.delete-tpl').forEach(btn => btn.addEventListener('click', () => {
+    if (!confirm('確定刪除此模板？')) return;
+    templates = templates.filter(t => t.id !== btn.dataset.id);
+    saveTemplates(templates);
+    renderTemplatesManageList();
+    renderTemplatesBar();
+    toast('已刪除模板', 'ok');
+  }));
+}
+
+let _tplEditType = 'expense';
+function openTemplateEditModal(editId) {
+  const t = editId ? templates.find(x => x.id === editId) : null;
+  _tplEditType = t?.type === 'income' ? 'income' : 'expense';
+  $('#template-edit-title').textContent = t ? '編輯模板' : '新增模板';
+  $('#tpl-edit-id').value = t ? t.id : '';
+  $('#tpl-name').value = t ? t.name : '';
+  $('#tpl-amount').value = t && t.amount ? t.amount : '';
+  $('#tpl-currency').value = t?.currency || 'MOP';
+  $('#tpl-note').value = t?.note || '';
+  $$('#template-edit-form .type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tplType === _tplEditType);
+  });
+  const catSel = $('#tpl-category');
+  if (catSel) {
+    catSel.innerHTML = CATEGORIES.map(c =>
+      `<option value="${c.name}">${c.icon} ${c.name}</option>`
+    ).join('');
+    if (t?.category) catSel.value = t.category;
+  }
+  const accSel = $('#tpl-account');
+  if (accSel) {
+    accSel.innerHTML = '<option value="">不指定</option>';
+    accounts.filter(a => a.type !== '電子錢包' && a.type !== '應收帳款').forEach(a => {
+      const o = document.createElement('option');
+      o.value = a.id;
+      o.textContent = `${ACCOUNT_TYPE_ICONS[a.type] || ''} ${a.name}`;
+      accSel.appendChild(o);
+    });
+    if (t?.accountId) accSel.value = t.accountId;
+  }
+  $('#template-edit-overlay')?.classList.remove('hidden');
+}
+function closeTemplateEditModal() {
+  $('#template-edit-overlay')?.classList.add('hidden');
+}
+function handleTemplateEditSubmit(e) {
+  e.preventDefault();
+  const id = $('#tpl-edit-id').value || genId();
+  const name = ($('#tpl-name').value || '').trim();
+  if (!name) { alert('請輸入名稱'); return; }
+  const amount = Math.max(0, Number($('#tpl-amount').value) || 0);
+  const item = {
+    id, name,
+    type: _tplEditType,
+    amount,
+    currency: $('#tpl-currency').value || 'MOP',
+    category: $('#tpl-category').value || '其他',
+    accountId: $('#tpl-account').value || '',
+    note: ($('#tpl-note').value || '').trim()
+  };
+  const idx = templates.findIndex(x => x.id === id);
+  if (idx >= 0) templates[idx] = item; else templates.push(item);
+  saveTemplates(templates);
+  closeTemplateEditModal();
+  renderTemplatesManageList();
+  renderTemplatesBar();
+  toast(idx >= 0 ? '已更新模板' : '已新增模板', 'ok');
+}
+
+/* ===== 本月 vs 上月 ===== */
+function calcMonthStats(year, month) {
+  let income = 0, consumption = 0, savings = 0;
+  records.forEach(r => {
+    const d = String(r.date || '');
+    let y, m;
+    if (d.length >= 7) {
+      y = Number(d.slice(0, 4));
+      m = Number(d.slice(5, 7)) - 1;
+    } else {
+      const dt = new Date(r.date);
+      if (Number.isNaN(dt.getTime())) return;
+      y = dt.getFullYear(); m = dt.getMonth();
+    }
+    if (y !== year || m !== month) return;
+    if (isTransfer(r) || isCollectReceivable(r) || isInterest(r) || isAdjustment(r)) return;
+    if (isSavings(r)) { savings += toMOP(r.amount, r.currency); return; }
+    if (isAdvance(r)) {
+      const selfAmt = toMOP(r.selfAmount != null ? r.selfAmount : 0, r.currency);
+      if (selfAmt > 0) consumption += selfAmt;
+      return;
+    }
+    const amt = toMOP(r.amount, r.currency);
+    if (r.type === 'income') income += amt;
+    else if (r.type === 'expense' && !isRepayment(r)) consumption += amt;
+  });
+  return { income, consumption, savings, balance: income - consumption - savings };
+}
+function formatMomDelta(cur, prev, invertGood) {
+  const diff = cur - prev;
+  if (Math.abs(diff) < 0.005) return { text: '與上月持平', cls: 'flat' };
+  const pct = prev !== 0 ? (diff / Math.abs(prev)) * 100 : (cur > 0 ? 100 : 0);
+  const arrow = diff > 0 ? '↑' : '↓';
+  const sign = diff > 0 ? '+' : '';
+  // invertGood: 支出上升是壞（up=紅），收入上升是好
+  let cls;
+  if (invertGood) cls = diff > 0 ? 'up' : 'down';
+  else cls = diff > 0 ? 'up' : 'down';
+  return {
+    text: `${arrow} ${sign}${formatMoney(diff)}（${sign}${pct.toFixed(0)}%）`,
+    cls
+  };
+}
+function renderMonthCompare() {
+  const el = document.getElementById('mom-compare');
+  if (!el) return;
+  let py = currentYear, pm = currentMonth - 1;
+  if (pm < 0) { pm = 11; py--; }
+  const cur = calcMonthStats(currentYear, currentMonth);
+  const prev = calcMonthStats(py, pm);
+  const expD = formatMomDelta(cur.consumption, prev.consumption, true);
+  const incD = formatMomDelta(cur.income, prev.income, false);
+  const balD = formatMomDelta(cur.balance, prev.balance, false);
+  el.innerHTML = `
+    <div class="mom-card">
+      <div class="mom-label">消費 vs 上月</div>
+      <div class="mom-val">${formatMoney(cur.consumption)}</div>
+      <div class="mom-delta ${expD.cls}">${expD.text}</div>
+    </div>
+    <div class="mom-card mom-income">
+      <div class="mom-label">收入 vs 上月</div>
+      <div class="mom-val">${formatMoney(cur.income)}</div>
+      <div class="mom-delta ${incD.cls}">${incD.text}</div>
+    </div>
+    <div class="mom-card mom-income">
+      <div class="mom-label">結餘 vs 上月</div>
+      <div class="mom-val">${formatMoney(cur.balance)}</div>
+      <div class="mom-delta ${balD.cls}">${balD.text}</div>
+    </div>`;
+}
+
 /** 輕量提示（取代部分 alert） */
 function toast(msg, type = 'info') {
   let el = document.getElementById('app-toast');
@@ -2526,22 +3088,111 @@ function scopedKey(key) {
 }
 function loadJSON(key, fallback) {
   try {
-    const d = localStorage.getItem(scopedKey(key));
+    // 若有尚未寫入的佇列，優先用記憶體快照（避免讀到舊值）
+    const sk = scopedKey(key);
+    if (_localWriteQueue.has(sk)) return _cloneForStorage(_localWriteQueue.get(sk));
+    const d = localStorage.getItem(sk);
     return d ? JSON.parse(d) : fallback;
   } catch { return fallback; }
 }
 function loadJSONRaw(key, fallback) {
   // 強制讀取未加 uid 的訪客鍵
   try {
+    if (_localWriteQueue.has(key)) return _cloneForStorage(_localWriteQueue.get(key));
     const d = localStorage.getItem(key);
     return d ? JSON.parse(d) : fallback;
   } catch { return fallback; }
 }
+
+/* ===== 非同步本機寫入（防抖 + idle，避免大量 JSON.stringify / setItem 卡住 UI） ===== */
+const LOCAL_WRITE_DEBOUNCE_MS = 150;
+const _localWriteQueue = new Map(); // storageKey -> 資料快照
+let _localWriteTimer = null;
+let _localWriteIdleId = null;
+
+function _cloneForStorage(val) {
+  if (val == null || typeof val !== 'object') return val;
+  try {
+    if (typeof structuredClone === 'function') return structuredClone(val);
+  } catch (_) {}
+  try { return JSON.parse(JSON.stringify(val)); } catch (_) { return val; }
+}
+
+function _cancelScheduledLocalFlush() {
+  if (_localWriteTimer != null) {
+    clearTimeout(_localWriteTimer);
+    _localWriteTimer = null;
+  }
+  if (_localWriteIdleId != null && typeof cancelIdleCallback === 'function') {
+    try { cancelIdleCallback(_localWriteIdleId); } catch (_) {}
+    _localWriteIdleId = null;
+  }
+}
+
+/** 實際寫入 localStorage（可在 idle 或同步路徑呼叫） */
+function _flushLocalWriteQueue(sync) {
+  _cancelScheduledLocalFlush();
+  if (!_localWriteQueue.size) return;
+  const entries = Array.from(_localWriteQueue.entries());
+  _localWriteQueue.clear();
+
+  const doWrite = () => {
+    for (let i = 0; i < entries.length; i++) {
+      const k = entries[i][0];
+      const v = entries[i][1];
+      try {
+        localStorage.setItem(k, JSON.stringify(v));
+      } catch (err) {
+        console.warn('[storage] localStorage 寫入失敗', k, err);
+        // 配額滿時回報一次
+        if (err && (err.name === 'QuotaExceededError' || err.code === 22)) {
+          try { toast('本機儲存空間不足，部分變更可能未保存', 'err'); } catch (_) {}
+        }
+      }
+    }
+  };
+
+  if (sync) {
+    doWrite();
+    return;
+  }
+  if (typeof requestIdleCallback === 'function') {
+    _localWriteIdleId = requestIdleCallback(() => {
+      _localWriteIdleId = null;
+      doWrite();
+    }, { timeout: 600 });
+  } else {
+    _localWriteTimer = setTimeout(() => {
+      _localWriteTimer = null;
+      doWrite();
+    }, 0);
+  }
+}
+
+/** 排程寫入：合併同 key 的多次變更，延後 stringify + setItem */
+function scheduleLocalWrite(storageKey, val) {
+  _localWriteQueue.set(storageKey, _cloneForStorage(val));
+  if (_localWriteTimer != null) clearTimeout(_localWriteTimer);
+  if (_localWriteIdleId != null && typeof cancelIdleCallback === 'function') {
+    try { cancelIdleCallback(_localWriteIdleId); } catch (_) {}
+    _localWriteIdleId = null;
+  }
+  _localWriteTimer = setTimeout(() => {
+    _localWriteTimer = null;
+    _flushLocalWriteQueue(false);
+  }, LOCAL_WRITE_DEBOUNCE_MS);
+}
+
+/** 立即寫入所有待存資料（離開頁面／清空／匯入前呼叫） */
+function flushLocalStorageSync() {
+  _flushLocalWriteQueue(true);
+}
+
 function writeLocalOnly(key, val) {
-  localStorage.setItem(scopedKey(key), JSON.stringify(val));
+  scheduleLocalWrite(scopedKey(key), val);
 }
 function saveJSON(key, val) {
-  localStorage.setItem(scopedKey(key), JSON.stringify(val));
+  scheduleLocalWrite(scopedKey(key), val);
   // 只有已登入才同步到該帳戶雲端；訪客資料絕不寫入任何帳戶
   if (currentUser) {
     const mod = KEY_TO_MODULE[key];
@@ -2550,7 +3201,17 @@ function saveJSON(key, val) {
   }
 }
 function saveJSONRaw(key, val) {
-  localStorage.setItem(key, JSON.stringify(val));
+  scheduleLocalWrite(key, val);
+}
+
+// 離開頁面／背景前強制落盤，避免防抖中的資料遺失
+if (typeof window !== 'undefined') {
+  const _forceFlushLocal = () => { try { flushLocalStorageSync(); } catch (_) {} };
+  window.addEventListener('pagehide', _forceFlushLocal);
+  window.addEventListener('beforeunload', _forceFlushLocal);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') _forceFlushLocal();
+  });
 }
 function markDirty(mod) {
   if (!DIRTY.hasOwnProperty(mod)) return;
@@ -3113,6 +3774,7 @@ function renderAnalysisMonth() {
   const label = $('#analysis-month-label');
   if (label) label.textContent = `${currentYear}年${currentMonth + 1}月`;
   renderAnalysisMonthSummary();
+  renderMonthCompare();
   renderMonthBars();
   renderMonthDonut();
   renderCustomCatSum();
@@ -3210,7 +3872,12 @@ function renderSavingsGoalsList() {
     if (overdue) meta += ' · 已過期';
     if (g.note) meta += (meta ? ' · ' : '') + escapeHtml(g.note);
     const fillCls = done ? 'done' : (overdue ? 'overdue' : '');
-    return `<div class="goal-card" data-id="${g.id}">
+    const barPct = target > 0 ? Math.min(100, pct) : 0;
+    const r = 22;
+    const circ = 2 * Math.PI * r;
+    const dash = circ * (1 - barPct / 100);
+    const pigColor = done ? '#10B981' : (overdue ? '#F43F5E' : '#4F46E5');
+    return `<div class="goal-card${done ? ' done-card' : ''}" data-id="${g.id}">
       <div class="goal-card-header">
         <div>
           <div class="goal-card-name">${escapeHtml(g.name)}</div>
@@ -3221,12 +3888,29 @@ function renderSavingsGoalsList() {
           <button type="button" class="delete delete-goal" data-id="${g.id}">刪除</button>
         </div>
       </div>
-      <div class="goal-progress-row">
-        <span>${money('MOP', saved)} / ${money('MOP', target)}</span>
-        <span>${target > 0 ? pct.toFixed(0) + '%' : '—'}${done ? ' ✓' : ''}</span>
+      <div class="goal-visual">
+        <div class="piggy-wrap${done ? ' done' : ''}" title="${barPct.toFixed(0)}%">
+          <svg class="piggy-svg" viewBox="0 0 56 56" aria-hidden="true">
+            <circle cx="28" cy="28" r="${r}" fill="none" stroke="rgba(148,163,184,0.25)" stroke-width="5"/>
+            <circle cx="28" cy="28" r="${r}" fill="none" stroke="${pigColor}" stroke-width="5"
+              stroke-linecap="round"
+              stroke-dasharray="${circ.toFixed(2)}"
+              stroke-dashoffset="${dash.toFixed(2)}"
+              transform="rotate(-90 28 28)"
+              style="transition: stroke-dashoffset .4s ease"/>
+            <text x="28" y="34" text-anchor="middle" font-size="18">🐷</text>
+          </svg>
+          <span class="piggy-pct">${target > 0 ? Math.min(999, pct).toFixed(0) + '%' : '—'}</span>
+        </div>
+        <div class="goal-bar">
+          <div class="goal-progress-row" style="margin-top:0">
+            <span>${money('MOP', saved)} / ${money('MOP', target)}</span>
+            <span>${done ? '✓' : ''}</span>
+          </div>
+          <div class="goal-bar"><div class="goal-bar-fill ${fillCls}" style="width:${barPct}%"></div></div>
+          <div class="goal-card-meta" style="margin-top:6px">${done ? '🎉 已達標' : (target > 0 ? `還差 ${money('MOP', remain)}` : '')}</div>
+        </div>
       </div>
-      <div class="goal-bar"><div class="goal-bar-fill ${fillCls}" style="width:${target > 0 ? Math.min(100, pct) : 0}%"></div></div>
-      <div class="goal-card-meta" style="margin-top:6px">${done ? '🎉 已達標' : (target > 0 ? `還差 ${money('MOP', remain)}` : '')}</div>
     </div>`;
   }).join('');
   box.querySelectorAll('.edit-goal').forEach(btn => btn.addEventListener('click', () => openSavingsGoalModal(btn.dataset.id)));
@@ -3585,6 +4269,7 @@ function renderMonthly() {
   }
   populateFilterOptions();
   renderMonthRecords();
+  renderTemplatesBar();
 }
 
 function renderMonthBars() {
@@ -4716,7 +5401,11 @@ function openAddModal() {
     b.classList.toggle('active', b.dataset.type === currentType);
   });
   $('#modal-overlay').classList.remove('hidden');
-  setTimeout(() => { const a = $('#amount'); if (a) a.focus(); }, 100);
+  setTimeout(() => {
+    const active = $('#record-form .type-btn.active');
+    if (active && active.scrollIntoView) active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+    const a = $('#amount'); if (a) a.focus();
+  }, 100);
 }
 
 function openEditModal(id) {
@@ -4758,6 +5447,10 @@ function openEditModal(id) {
   if ($('#advance-toggle-row')) $('#advance-toggle-row').classList.toggle('hidden', !isAdvance(r));
   // 刪除按鈕：在編輯 modal 標題旁（若無則靠表單外）
   $('#modal-overlay').classList.remove('hidden');
+  setTimeout(() => {
+    const active = $('#record-form .type-btn.active');
+    if (active && active.scrollIntoView) active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  }, 80);
 }
 
 function closeModal() { $('#modal-overlay').classList.add('hidden'); }
@@ -6389,14 +7082,14 @@ async function clearAllData() {
   sectionCollapseState = { dist: false, accounts: false, mpf: false, liabilities: false, otherAccounts: false };
 
   try {
-    localStorage.removeItem(scopedKey(STORAGE_KEY));
-    localStorage.removeItem(scopedKey(ACCOUNTS_KEY));
-    localStorage.removeItem(scopedKey(LIABILITIES_KEY));
-    localStorage.removeItem(scopedKey(MPF_KEY));
-    localStorage.removeItem(scopedKey(RATES_KEY));
-    localStorage.removeItem(scopedKey(BUDGET_KEY));
-    localStorage.removeItem(scopedKey(CUSTOM_CAT_SUM_KEY));
-    localStorage.removeItem(scopedKey(YEAR_CUSTOM_CAT_SUM_KEY));
+    // 取消尚未寫入的佇列，避免清空後又被 flush 寫回舊資料
+    const keysToClear = [
+      STORAGE_KEY, ACCOUNTS_KEY, LIABILITIES_KEY, MPF_KEY, RATES_KEY, BUDGET_KEY,
+      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY
+    ].map(k => scopedKey(k));
+    _cancelScheduledLocalFlush();
+    keysToClear.forEach(k => _localWriteQueue.delete(k));
+    keysToClear.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
 
   // 雲端同步清空（若已登入）
@@ -6594,6 +7287,27 @@ function init() {
   $('#settings-monthly-overlay')?.addEventListener('click', e => { if (e.target.id === 'settings-monthly-overlay') closeMonthlySettings(); });
   $('#btn-settings-export')?.addEventListener('click', () => { closeMonthlySettings(); $('#export-modal-overlay').classList.remove('hidden'); });
   $('#btn-settings-rates')?.addEventListener('click', () => { closeMonthlySettings(); openRatesModal(); });
+  $('#btn-settings-templates')?.addEventListener('click', () => { closeMonthlySettings(); openTemplatesModal(); });
+  $('#btn-toggle-theme')?.addEventListener('click', () => { toggleTheme(); });
+
+  // 常用模板 modal
+  $('#btn-close-templates')?.addEventListener('click', closeTemplatesModal);
+  $('#templates-modal-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'templates-modal-overlay') closeTemplatesModal();
+  });
+  $('#btn-add-template')?.addEventListener('click', () => openTemplateEditModal());
+  $('#btn-close-template-edit')?.addEventListener('click', closeTemplateEditModal);
+  $('#btn-cancel-template-edit')?.addEventListener('click', closeTemplateEditModal);
+  $('#template-edit-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'template-edit-overlay') closeTemplateEditModal();
+  });
+  $('#template-edit-form')?.addEventListener('submit', handleTemplateEditSubmit);
+  $$('#template-edit-form .type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _tplEditType = btn.dataset.tplType === 'income' ? 'income' : 'expense';
+      $$('#template-edit-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.tplType === _tplEditType));
+    });
+  });
 
   // 資產頁設定
   const openAssetsSettings = () => $('#settings-assets-overlay').classList.remove('hidden');
@@ -6872,6 +7586,8 @@ function init() {
 
   updateOfflineBanner();
   ensureGlobalRecordDelegation();
+  try { templates = loadTemplates(); } catch (_) { templates = DEFAULT_TEMPLATES.map(t => ({ ...t })); }
+  initTheme();
   accrueDailyInterest();
   startInterestAutoAccrue();
   switchPage('monthly');
