@@ -2593,6 +2593,12 @@ let db = null;
 let currentUser = null;
 let syncing = false;
 let cloudConnected = true;
+/** 雲端即時監聽 */
+let _userDataRef = null;
+let _connectedRef = null;
+let _cloudListenerReady = false; // 首次 value 事件是否已處理
+let _suppressCloudApply = false; // 本機推送期間略過回寫覆蓋
+let _lastCloudUpdatedAt = 0;
 
 // 增量同步：只上傳變更過的模組
 const DIRTY = { records: false, accounts: false, liabilities: false, mpfData: false, rates: false, budget: false };
@@ -3425,7 +3431,19 @@ function initFirebase() {
           console.error(err);
           toast('雲端同步失敗：' + (err.message || err), 'err');
         }
+      } else {
+        detachCloudListeners();
+        updateOfflineBanner();
       }
+    });
+    // 瀏覽器 online/offline
+    window.addEventListener('online', () => {
+      updateOfflineBanner();
+      if (currentUser && cloudConnected) scheduleCloudSync(false);
+    });
+    window.addEventListener('offline', () => {
+      updateOfflineBanner();
+      setSyncStatus('offline');
     });
     console.info('Firebase 已啟用');
   } catch (err) {
@@ -3559,6 +3577,115 @@ function persistGuestSnapshotFromMemory() {
   saveJSONRaw(BUDGET_KEY, normalizeBudget(budget));
 }
 
+
+function hasPendingCloudOps() {
+  return !!(
+    pendingRecordOps.size || pendingAccountOps.size ||
+    pendingLiabilityOps.size || pendingMpfOps.size ||
+    Object.values(DIRTY).some(Boolean)
+  );
+}
+
+function detachCloudListeners() {
+  try {
+    if (_userDataRef) {
+      _userDataRef.off();
+      _userDataRef = null;
+    }
+  } catch (_) {}
+  try {
+    if (_connectedRef) {
+      _connectedRef.off();
+      _connectedRef = null;
+    }
+  } catch (_) {}
+  _cloudListenerReady = false;
+}
+
+/** 監聽 Firebase 連線狀態 + 使用者資料即時同步 */
+function attachCloudListeners(uid) {
+  if (!db || !uid) return;
+  detachCloudListeners();
+
+  // .info/connected：即時知道是否連上 RTDB
+  _connectedRef = db.ref('.info/connected');
+  _connectedRef.on('value', (snap) => {
+    const was = cloudConnected;
+    cloudConnected = !!snap.val();
+    updateOfflineBanner();
+    if (cloudConnected) {
+      if (!was) {
+        // 剛重連：推送本機待同步，並讓 value 監聽拉最新
+        setSyncStatus('syncing');
+        if (currentUser) scheduleCloudSync(false);
+      }
+    } else {
+      setSyncStatus('offline');
+    }
+  });
+
+  // 使用者資料即時監聽（取代只 once 一次）
+  _userDataRef = db.ref('users/' + uid);
+  _userDataRef.on('value', (snap) => {
+    const cloud = snap.val();
+    const isFirst = !_cloudListenerReady;
+    _cloudListenerReady = true;
+
+    // 本機正在推送、或有未送完佇列時，不要用雲端整包蓋掉本機
+    if (_suppressCloudApply || syncing || hasPendingCloudOps()) {
+      if (isFirst) {
+        // 首次仍盡量套用（登入當下佇列已清），避免空白畫面
+        // 但若真有 pending 則跳過
+        if (hasPendingCloudOps() || syncing || _suppressCloudApply) {
+          setSyncStatus(cloudConnected ? 'ok' : 'offline');
+          return;
+        }
+      } else {
+        setSyncStatus(cloudConnected ? 'ok' : 'offline');
+        return;
+      }
+    }
+
+    // 避免自己寫入後 updatedAt 相同時重複重繪（仍允許首次）
+    const remoteUpdated = cloud && cloud.updatedAt ? Number(cloud.updatedAt) : 0;
+    if (!isFirst && remoteUpdated && remoteUpdated === _lastCloudUpdatedAt) {
+      setSyncStatus(cloudConnected ? 'ok' : 'offline');
+      return;
+    }
+    if (remoteUpdated) _lastCloudUpdatedAt = remoteUpdated;
+
+    if (cloud && (cloud.records || cloud.recordMap || cloud.accounts || cloud.accountMap || cloud.mpfData || cloud.mpfMap || cloud.liabilities || cloud.liabilityMap || cloud.rates || cloud.budget)) {
+      applyDataPayload(cloud);
+    } else if (isFirst) {
+      applyDataPayload({
+        records: [],
+        accounts: [],
+        liabilities: [],
+        mpfData: { accounts: [] },
+        rates: { ...DEFAULT_RATES },
+        budget: { amount: 0, categories: [] }
+      });
+    } else {
+      setSyncStatus(cloudConnected ? 'ok' : 'offline');
+      return;
+    }
+
+    persistLocal(false);
+    if (isFirst && typeof accrueDailyInterest === 'function') {
+      try { accrueDailyInterest(); } catch (e) { console.error(e); }
+    }
+    setSyncStatus(cloudConnected ? 'ok' : 'offline');
+    if (isFirst) {
+      toast('已載入帳戶資料（即時同步已啟用）', 'ok');
+    }
+    if (typeof switchPage === 'function') switchPage(currentPage);
+  }, (err) => {
+    console.error('雲端監聽錯誤', err);
+    setSyncStatus('err', err.message || String(err));
+    toast('雲端即時同步失敗：' + (err.message || err), 'err');
+  });
+}
+
 async function onUserSignedIn(user) {
   // 先保存訪客資料到訪客鍵，稍後登出可還原；絕不把訪客資料自動寫入此帳戶
   if (!onUserSignedIn._guestSaved) {
@@ -3573,40 +3700,18 @@ async function onUserSignedIn(user) {
   pendingMpfOps.clear();
   Object.keys(DIRTY).forEach(k => { DIRTY[k] = false; });
   clearTimeout(scheduleCloudSync._t);
+  _lastCloudUpdatedAt = 0;
+  _suppressCloudApply = false;
 
-  let cloud = null;
+  setSyncStatus('syncing');
+  // 即時監聽：首次 value 會載入資料並啟用持續同步
   try {
-    const snap = await db.ref('users/' + user.uid).once('value');
-    cloud = snap.val();
+    attachCloudListeners(user.uid);
   } catch (err) {
     console.error(err);
     toast('讀取雲端資料失敗：' + (err.message || err), 'err');
+    setSyncStatus('err', err.message || String(err));
   }
-
-  if (cloud && (cloud.records || cloud.recordMap || cloud.accounts || cloud.accountMap || cloud.mpfData || cloud.mpfMap || cloud.liabilities || cloud.liabilityMap)) {
-    // 僅載入此帳戶雲端資料（不合併訪客本機）
-    applyDataPayload(cloud);
-  } else {
-    // 此帳戶尚無資料 → 使用空白資料，不把訪客本機紀錄轉移到此帳戶
-    applyDataPayload({
-      records: [],
-      accounts: [],
-      liabilities: [],
-      mpfData: { accounts: [] },
-      rates: { ...DEFAULT_RATES },
-      budget: { amount: 0, categories: [] }
-    });
-  }
-
-  // 只寫入此 uid 的本機快取，不標記 DIRTY、不觸發上傳
-  persistLocal(false);
-  // 雲端資料載入後再補算日息（init 時可能還是訪客／舊本機資料）
-  if (typeof accrueDailyInterest === 'function') {
-    try { accrueDailyInterest(); } catch (e) { console.error(e); }
-  }
-  toast('已載入帳戶資料（未匯入訪客本機紀錄）', 'ok');
-  setSyncStatus('ok');
-  switchPage(currentPage);
 }
 
 /** Firebase RTDB 不接受 undefined，用 JSON 去掉後再寫入 */
@@ -3638,6 +3743,7 @@ async function pushAllToCloud(forceAll = false) {
   if (!DIRTY.mpfData) pendingMpfOps.clear();
 
   syncing = true;
+  _suppressCloudApply = true;
   setSyncStatus('syncing');
   try {
     // 分路徑 update：相對於 users/{uid}
@@ -3665,7 +3771,9 @@ async function pushAllToCloud(forceAll = false) {
     if (DIRTY.budget) {
       updates.budget = stripUndefined(normalizeBudget(budget));
     }
-    await db.ref('users/' + currentUser.uid).update(stripUndefined(updates));
+    const payload = stripUndefined(updates);
+    await db.ref('users/' + currentUser.uid).update(payload);
+    if (payload.updatedAt) _lastCloudUpdatedAt = Number(payload.updatedAt);
     mods.forEach(k => { DIRTY[k] = false; });
     setSyncStatus('ok');
   } catch (err) {
@@ -3682,6 +3790,8 @@ async function pushAllToCloud(forceAll = false) {
     toast('同步失敗：' + (err.message || err), 'err');
   }
   syncing = false;
+  // 稍後再允許套用雲端，避免剛寫入的 echo 蓋掉本機未完成佇列
+  setTimeout(() => { _suppressCloudApply = false; }, 400);
   if (Object.values(DIRTY).some(Boolean) || pendingRecordOps.size || pendingAccountOps.size || pendingLiabilityOps.size || pendingMpfOps.size) {
     scheduleCloudSync(false);
   }
@@ -3704,6 +3814,7 @@ async function handleAuthClick() {
       // 登出前先把目前帳戶資料推上雲端
       try { await pushAllToCloud(true); } catch (_) {}
       onUserSignedIn._guestSaved = false;
+      detachCloudListeners();
       await auth.signOut();
       currentUser = null;
       // 還原訪客本機資料（與帳戶資料分離）
@@ -3714,6 +3825,7 @@ async function handleAuthClick() {
       Object.keys(DIRTY).forEach(k => { DIRTY[k] = false; });
       loadGuestDataIntoMemory();
       updateAuthButton();
+      updateOfflineBanner();
       toast('已登出，已還原訪客本機資料', 'ok');
       switchPage(currentPage);
     }
