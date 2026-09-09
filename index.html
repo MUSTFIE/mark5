@@ -601,24 +601,7 @@ form { padding: 14px 18px 20px; }
   background: var(--grad-primary); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .assets-hero-hint { margin-top: 8px; font-size: 0.68rem; color: var(--muted); font-weight: 500; opacity: 0.9; }
-.assets-deposit-mom {
-  margin-top: 10px;
-  font-size: 0.78rem;
-  font-weight: 650;
-  color: var(--muted);
-  line-height: 1.45;
-}
-.assets-deposit-mom .mom-delta { font-weight: 700; }
-.assets-deposit-mom .mom-delta.up { color: var(--income); }
-.assets-deposit-mom .mom-delta.down { color: var(--expense); }
-.assets-deposit-mom .mom-delta.flat { color: var(--muted); }
-.assets-deposit-mom .mom-prev {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  opacity: 0.9;
-}
+
 
 .account-item {
   padding: 14px; margin-bottom: 10px; cursor: pointer;
@@ -1664,7 +1647,6 @@ form { padding: 14px 18px 20px; }
   <span class="label">總存款：</span>
   <span class="value" id="assets-deposit">MOP 0</span>
 </p>
-  <div id="assets-deposit-mom" class="assets-deposit-mom" aria-label="總存款與上月對比"></div>
   </div>
   <div class="summary-cards summary-assets-secondary">
    <div class="card income"><div class="label">總資產</div><div class="value" id="assets-gross">0</div></div>
@@ -2571,7 +2553,6 @@ const LIABILITIES_KEY = 'accounting_liabilities_v1';
 const MPF_KEY = 'accounting_mpf_v3';
 const CUSTOM_CAT_SUM_KEY = 'accounting_custom_cat_sum_v1';
 const BUDGET_KEY = 'accounting_budget_v1';
-const DEPOSIT_HISTORY_KEY = 'accounting_deposit_history_v1';
 const INTEREST_FLOOR = '2026-08-08';
 
 const DEFAULT_RATES = { MOP: 1, HKD: 1.03, CNY: 1.196, HKD_CNY: 0.86 };
@@ -5018,15 +4999,21 @@ function saveYearCustomCatSum(cats) {
 function renderYearCustomCatSum(byCat) {
   const box = $('#year-custom-cat-sum');
   if (!box) return;
-  if (!byCat) {
+  // 自訂加總獨立彙總（含信用卡還款），不沿用圖表 byCat（圖表仍不含還款）
+  {
     byCat = {};
     getYearRecords().forEach(r => {
-      if (isRepayment(r) || isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
+      if (isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
       if (isAdvance(r)) {
         const selfAmt = Number(r.selfAmount) || 0;
         if (selfAmt <= 0) return;
         const c = r.category || '其他';
         byCat[c] = (byCat[c] || 0) + toMOP(selfAmt, r.currency);
+        return;
+      }
+      if (isRepayment(r)) {
+        const c = r.category || '信用卡還款';
+        byCat[c] = (byCat[c] || 0) + toMOP(r.amount, r.currency);
         return;
       }
       if (r.type !== 'expense') return;
@@ -6118,12 +6105,18 @@ function renderCustomCatSum() {
   if (!box) return;
   const byCat = {};
   getMonthRecords().forEach(r => {
-    if (isRepayment(r) || isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
+    if (isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
     if (isAdvance(r)) {
       const selfAmt = Number(r.selfAmount) || 0;
       if (selfAmt <= 0) return;
       const c = r.category || '其他';
       byCat[c] = (byCat[c] || 0) + toMOP(selfAmt, r.currency);
+      return;
+    }
+    // 含信用卡還款（可勾選加總）
+    if (isRepayment(r)) {
+      const c = r.category || '信用卡還款';
+      byCat[c] = (byCat[c] || 0) + toMOP(r.amount, r.currency);
       return;
     }
     if (r.type !== 'expense') return;
@@ -6171,10 +6164,13 @@ function renderCustomCatRecords(selectedSet) {
     return;
   }
   const list = getMonthRecords().filter(r => {
-    if (isRepayment(r) || isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return false;
+    if (isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return false;
     if (isAdvance(r)) {
       const selfAmt = Number(r.selfAmount) || 0;
       return selfAmt > 0 && selected.has(r.category || '其他');
+    }
+    if (isRepayment(r)) {
+      return selected.has(r.category || '信用卡還款');
     }
     return r.type === 'expense' && selected.has(r.category || '其他');
   }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)));
@@ -6762,147 +6758,6 @@ function mpfToHKD(a) {
   return convertAmount(Number(a.balance) || 0, mpfCurrency(a), 'HKD');
 }
 
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-function prevMonthKey(key) {
-  const [ys, ms] = String(key).split('-');
-  let y = Number(ys), m = Number(ms) - 1;
-  if (m < 1) { m = 12; y--; }
-  return `${y}-${String(m).padStart(2, '0')}`;
-}
-/** 指定年月的最後一天 YYYY-MM-DD（本地曆） */
-function endOfMonthStr(year, month0) {
-  const d = new Date(year, month0 + 1, 0);
-  return formatDateLocal(d);
-}
-
-/**
- * 在「餘額副本」上套用 delta（不改真實 accounts）
- * 規則與 applyBalanceDelta 一致：電子錢包略過
- */
-function mapBalanceDelta(map, accountId, currency, delta) {
-  if (!accountId || !currency || !delta) return;
-  const acc = accounts.find(a => a.id === accountId);
-  if (acc && acc.type === '電子錢包') return;
-  if (!map[accountId]) map[accountId] = { MOP: 0, HKD: 0, CNY: 0 };
-  const cur = currency === 'HKD' || currency === 'CNY' ? currency : 'MOP';
-  map[accountId][cur] = Number(map[accountId][cur] || 0) + delta;
-}
-
-/** 將一筆紀錄的「反向效果」套到餘額副本（純計算，不改真實資料） */
-function reverseRecordOnMap(map, rec) {
-  if (!rec) return;
-  if (isSavings(rec)) return;
-  if (isInterest(rec)) {
-    mapBalanceDelta(map, rec.accountId, rec.currency, -(Number(rec.amount) || 0));
-    return;
-  }
-  if (isAdvance(rec)) {
-    const total = Number(rec.amount) || 0;
-    const recvAmt = Number(rec.recvAmount) || 0;
-    const payAcc = accounts.find(a => a.id === rec.accountId);
-    if (payAcc && payAcc.type === '信用卡') {
-      mapBalanceDelta(map, rec.accountId, rec.currency, -total);
-    } else {
-      mapBalanceDelta(map, rec.accountId, rec.currency, total);
-    }
-    if (rec.recvAccountId && recvAmt) {
-      mapBalanceDelta(map, rec.recvAccountId, rec.currency, -recvAmt);
-    }
-    return;
-  }
-  if (isTransfer(rec) || isCollectReceivable(rec)) {
-    mapBalanceDelta(map, rec.accountId, rec.currency, Number(rec.amount) || 0);
-    mapBalanceDelta(map, rec.toAccountId, rec.toCurrency || rec.currency, -(Number(rec.toAmount ?? rec.amount) || 0));
-    return;
-  }
-  const amt = Number(rec.amount) || 0;
-  if (isRepayment(rec)) {
-    mapBalanceDelta(map, rec.accountId, rec.currency, amt);
-    if (rec.repayToId) mapBalanceDelta(map, rec.repayToId, rec.currency, amt);
-    return;
-  }
-  // 一般收支：與 reverseRecordEffect 相同
-  let effectId = rec.accountId;
-  const acc0 = accounts.find(a => a.id === rec.accountId);
-  if (acc0 && acc0.type === '電子錢包' && acc0.linkedBankId) effectId = acc0.linkedBankId;
-  else if (rec.displayAccountId) effectId = rec.displayAccountId;
-  const acc = accounts.find(a => a.id === effectId);
-  if (!acc) return;
-  if (acc.type === '信用卡') {
-    mapBalanceDelta(map, effectId, rec.currency, rec.type === 'expense' ? -amt : amt);
-  } else {
-    mapBalanceDelta(map, effectId, rec.currency, rec.type === 'expense' ? amt : -amt);
-  }
-}
-
-/** 由餘額副本計算總存款（銀行+現金+投資+其他 − 扣減；不含強積金／信用卡／應收／錢包） */
-function calcDepositFromBalanceMap(map) {
-  let bankMop = 0, otherMop = 0;
-  accounts.forEach(a => {
-    if (a.type === '電子錢包' || a.type === '信用卡' || a.type === '應收帳款') return;
-    const b = map[a.id] || a.balances || {};
-    const mop = balancesToMOP(b);
-    if (a.type === '銀行') bankMop += mop;
-    else otherMop += mop;
-  });
-  let otherLiab = 0;
-  liabilities.forEach(l => { otherLiab += balancesToMOP(l.balances); });
-  return bankMop + otherMop - otherLiab;
-}
-
-/**
- * 流水倒推：以目前戶口餘額為起點，
- * 將「記帳日期 > asOfDate」的紀錄全部反向套用，得到 asOfDate 當日結束時的總存款。
- * asOfDate: 'YYYY-MM-DD'
- */
-function calcDepositAsOf(asOfDate) {
-  const map = {};
-  accounts.forEach(a => {
-    map[a.id] = {
-      MOP: Number(a.balances?.MOP) || 0,
-      HKD: Number(a.balances?.HKD) || 0,
-      CNY: Number(a.balances?.CNY) || 0
-    };
-  });
-  const cutoff = String(asOfDate || '').slice(0, 10);
-  if (!cutoff) return calcDepositFromBalanceMap(map);
-  records.forEach(r => {
-    const d = String(r.date || '').slice(0, 10);
-    if (d && d > cutoff) reverseRecordOnMap(map, r);
-  });
-  return calcDepositFromBalanceMap(map);
-}
-
-/** 上月月底總存款（流水倒推） */
-function calcPrevMonthDeposit() {
-  const now = new Date();
-  let y = now.getFullYear();
-  let m = now.getMonth() - 1; // 0-based
-  if (m < 0) { m = 11; y--; }
-  const asOf = endOfMonthStr(y, m);
-  return { year: y, month: m, asOf, deposit: calcDepositAsOf(asOf) };
-}
-
-/** 相容舊呼叫：不再寫快照 */
-function recordDepositSnapshot(_deposit) { /* no-op：改為流水倒推 */ }
-
-/** 在資產頁總存款下方顯示 vs 上月（流水倒推） */
-function renderDepositMom(deposit) {
-  const el = $('#assets-deposit-mom');
-  if (!el) return;
-  const prev = calcPrevMonthDeposit();
-  const cur = Number(deposit) || 0;
-  const prevVal = Number(prev.deposit) || 0;
-  const d = formatMomDelta(cur, prevVal, false);
-  const cls = d.cls === 'flat' ? 'flat' : (cur >= prevVal ? 'up' : 'down');
-  el.innerHTML = `
-    <span class="mom-delta ${cls}">${d.text}</span>
-    <span class="mom-prev">上月（${prev.year}/${prev.month + 1}）總存款 ${money('MOP', prevVal)} · 流水倒推至 ${prev.asOf}</span>`;
-}
-
 function renderAssets() {
   let bankMop = 0, otherMop = 0;
   accounts.forEach(a => {
@@ -6929,9 +6784,6 @@ function renderAssets() {
     const depCard = depEl.closest('.card') || depEl.closest('.assets-hero');
     if (depCard) depCard.classList.toggle('warn-negative', deposit < 0);
   }
-  // 記錄本月總存款快照，並顯示與上月對比
-  recordDepositSnapshot(deposit);
-  renderDepositMom(deposit);
   const netVal = gross - totalLiab;
   const netEl = $('#assets-net');
   if (netEl) {
@@ -7441,7 +7293,7 @@ async function clearAllData() {
     // 取消尚未寫入的佇列，避免清空後又被 flush 寫回舊資料
     const keysToClear = [
       STORAGE_KEY, ACCOUNTS_KEY, LIABILITIES_KEY, MPF_KEY, RATES_KEY, BUDGET_KEY,
-      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY, DEPOSIT_HISTORY_KEY
+      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY
     ].map(k => scopedKey(k));
     _cancelScheduledLocalFlush();
     keysToClear.forEach(k => _localWriteQueue.delete(k));
