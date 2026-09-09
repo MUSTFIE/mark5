@@ -601,6 +601,24 @@ form { padding: 14px 18px 20px; }
   background: var(--grad-primary); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .assets-hero-hint { margin-top: 8px; font-size: 0.68rem; color: var(--muted); font-weight: 500; opacity: 0.9; }
+.assets-deposit-mom {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.assets-deposit-mom .mom-delta { font-weight: 700; }
+.assets-deposit-mom .mom-delta.up { color: var(--income); }
+.assets-deposit-mom .mom-delta.down { color: var(--expense); }
+.assets-deposit-mom .mom-delta.flat { color: var(--muted); }
+.assets-deposit-mom .mom-prev {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
 
 .account-item {
   padding: 14px; margin-bottom: 10px; cursor: pointer;
@@ -1646,6 +1664,7 @@ form { padding: 14px 18px 20px; }
   <span class="label">總存款：</span>
   <span class="value" id="assets-deposit">MOP 0</span>
 </p>
+  <div id="assets-deposit-mom" class="assets-deposit-mom" aria-label="總存款與上月對比"></div>
   </div>
   <div class="summary-cards summary-assets-secondary">
    <div class="card income"><div class="label">總資產</div><div class="value" id="assets-gross">0</div></div>
@@ -2552,6 +2571,7 @@ const LIABILITIES_KEY = 'accounting_liabilities_v1';
 const MPF_KEY = 'accounting_mpf_v3';
 const CUSTOM_CAT_SUM_KEY = 'accounting_custom_cat_sum_v1';
 const BUDGET_KEY = 'accounting_budget_v1';
+const DEPOSIT_HISTORY_KEY = 'accounting_deposit_history_v1';
 const INTEREST_FLOOR = '2026-08-08';
 
 const DEFAULT_RATES = { MOP: 1, HKD: 1.03, CNY: 1.196, HKD_CNY: 0.86 };
@@ -5016,6 +5036,15 @@ function netAssetAccounts() {
   return accounts.filter(a => a.type !== '電子錢包' && a.type !== '信用卡' && a.type !== '應收帳款');
 }
 
+/** 流水排序：優先依輸入時間 createdAt（新→舊），無則用日期／id */
+function sortByInputTime(a, b) {
+  const ta = a.createdAt || a.date || '';
+  const tb = b.createdAt || b.date || '';
+  const c = String(tb).localeCompare(String(ta));
+  if (c !== 0) return c;
+  return String(b.id || '').localeCompare(String(a.id || ''));
+}
+
 function getAccountLedger(accountId, monthKey = '') {
   return records
     .filter(r => {
@@ -5028,7 +5057,7 @@ function getAccountLedger(accountId, monthKey = '') {
       if (monthKey && String(r.date || '').slice(0, 7) !== monthKey) return false;
       return true;
     })
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    .sort(sortByInputTime);
 }
 
 function ledgerMonthOptions(accountId, isWallet) {
@@ -5237,7 +5266,7 @@ function renderAccountDetailLedger(accountId) {
         if (ledgerFilterMonth && String(r.date || '').slice(0, 7) !== ledgerFilterMonth) return false;
         return true;
       })
-      .sort((x, y) => new Date(y.date) - new Date(x.date));
+      .sort(sortByInputTime);
   } else {
     ledger = getAccountLedger(a.id, ledgerFilterMonth);
   }
@@ -6698,6 +6727,63 @@ function mpfToHKD(a) {
   return convertAmount(Number(a.balance) || 0, mpfCurrency(a), 'HKD');
 }
 
+/** 總存款月度快照（本機）：key = YYYY-MM → 金額(MOP) */
+function loadDepositHistory() {
+  return loadJSON(DEPOSIT_HISTORY_KEY, {}) || {};
+}
+function saveDepositHistory(hist) {
+  saveJSON(DEPOSIT_HISTORY_KEY, hist);
+}
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+function prevMonthKey(key) {
+  const [ys, ms] = String(key).split('-');
+  let y = Number(ys), m = Number(ms) - 1;
+  if (m < 1) { m = 12; y--; }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+/** 寫入／更新本月總存款快照（以目前計算值覆蓋） */
+function recordDepositSnapshot(deposit) {
+  try {
+    const hist = loadDepositHistory();
+    const key = currentMonthKey();
+    const rounded = Math.round(Number(deposit) * 100) / 100;
+    if (hist[key] !== rounded) {
+      hist[key] = rounded;
+      // 只保留最近 36 個月
+      const keys = Object.keys(hist).sort();
+      while (keys.length > 36) {
+        delete hist[keys.shift()];
+      }
+      saveDepositHistory(hist);
+    }
+  } catch (_) {}
+}
+/** 在資產頁總存款下方顯示 vs 上月 */
+function renderDepositMom(deposit) {
+  const el = $('#assets-deposit-mom');
+  if (!el) return;
+  const hist = loadDepositHistory();
+  const curKey = currentMonthKey();
+  const prevKey = prevMonthKey(curKey);
+  const prevVal = hist[prevKey];
+  if (prevVal == null || Number.isNaN(Number(prevVal))) {
+    el.innerHTML = '<span class="mom-prev">尚無上月總存款紀錄（下月起可對比）</span>';
+    return;
+  }
+  const prev = Number(prevVal);
+  const cur = Number(deposit) || 0;
+  const d = formatMomDelta(cur, prev, false);
+  // 存款增加為好 → up 用綠色
+  const cls = d.cls === 'flat' ? 'flat' : (cur >= prev ? 'up' : 'down');
+  const [py, pm] = prevKey.split('-');
+  el.innerHTML = `
+    <span class="mom-delta ${cls}">${d.text}</span>
+    <span class="mom-prev">上月（${Number(py)}/${Number(pm)}）總存款 ${money('MOP', prev)}</span>`;
+}
+
 function renderAssets() {
   let bankMop = 0, otherMop = 0;
   accounts.forEach(a => {
@@ -6724,6 +6810,9 @@ function renderAssets() {
     const depCard = depEl.closest('.card') || depEl.closest('.assets-hero');
     if (depCard) depCard.classList.toggle('warn-negative', deposit < 0);
   }
+  // 記錄本月總存款快照，並顯示與上月對比
+  recordDepositSnapshot(deposit);
+  renderDepositMom(deposit);
   const netVal = gross - totalLiab;
   const netEl = $('#assets-net');
   if (netEl) {
@@ -7233,7 +7322,7 @@ async function clearAllData() {
     // 取消尚未寫入的佇列，避免清空後又被 flush 寫回舊資料
     const keysToClear = [
       STORAGE_KEY, ACCOUNTS_KEY, LIABILITIES_KEY, MPF_KEY, RATES_KEY, BUDGET_KEY,
-      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY
+      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY, DEPOSIT_HISTORY_KEY
     ].map(k => scopedKey(k));
     _cancelScheduledLocalFlush();
     keysToClear.forEach(k => _localWriteQueue.delete(k));
