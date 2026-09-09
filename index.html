@@ -3297,6 +3297,37 @@ function balancesToMOP(b) {
   if (!b) return 0;
   return toMOP(b.MOP || 0, 'MOP') + toMOP(b.HKD || 0, 'HKD') + toMOP(b.CNY || 0, 'CNY');
 }
+/**
+ * 戶口主要貨幣顯示：
+ * 1) 若帳戶有 primaryCurrency 且該幣有餘額（或皆為 0）則用它
+ * 2) 否則取 |餘額| 最大的幣別；平手順序 MOP > HKD > CNY
+ * 回傳 { currency, amount }
+ */
+function accountPrimaryBalance(a) {
+  const b = (a && a.balances) || {};
+  const order = ['MOP', 'HKD', 'CNY'];
+  const pref = a && a.primaryCurrency && order.includes(a.primaryCurrency) ? a.primaryCurrency : null;
+  if (pref) {
+    const v = Number(b[pref]) || 0;
+    const anyNonZero = order.some(c => (Number(b[c]) || 0) !== 0);
+    if (!anyNonZero || v !== 0) return { currency: pref, amount: v };
+  }
+  let best = 'MOP';
+  let bestAbs = -1;
+  order.forEach(c => {
+    const v = Number(b[c]) || 0;
+    const abs = Math.abs(v);
+    if (abs > bestAbs) {
+      bestAbs = abs;
+      best = c;
+    }
+  });
+  return { currency: best, amount: Number(b[best]) || 0 };
+}
+function accountPrimaryMoney(a) {
+  const { currency, amount } = accountPrimaryBalance(a);
+  return money(currency, amount);
+}
 /** 以 id 找戶口（線性；資料量小足夠） */
 function findAccountById(id) {
   if (id == null || id === '') return null;
@@ -5036,12 +5067,18 @@ function netAssetAccounts() {
   return accounts.filter(a => a.type !== '電子錢包' && a.type !== '信用卡' && a.type !== '應收帳款');
 }
 
-/** 流水排序：優先依輸入時間 createdAt（新→舊），無則用日期／id */
+/** 流水排序：先依記帳日期（新→舊），同日再依輸入時間 createdAt（新→舊） */
 function sortByInputTime(a, b) {
-  const ta = a.createdAt || a.date || '';
-  const tb = b.createdAt || b.date || '';
-  const c = String(tb).localeCompare(String(ta));
-  if (c !== 0) return c;
+  const da = String(a.date || '').slice(0, 10);
+  const db = String(b.date || '').slice(0, 10);
+  const byDate = db.localeCompare(da);
+  if (byDate !== 0) return byDate;
+  const ta = a.createdAt || '';
+  const tb = b.createdAt || '';
+  if (ta || tb) {
+    const byTime = String(tb).localeCompare(String(ta));
+    if (byTime !== 0) return byTime;
+  }
   return String(b.id || '').localeCompare(String(a.id || ''));
 }
 
@@ -5129,17 +5166,16 @@ function renderAccounts() {
       const noAcc = $('#no-accounts');
       if (noAcc) noAcc.style.display = 'none';
       mainAccounts.forEach(a => {
-        const b = a.balances || { MOP: 0, HKD: 0, CNY: 0 };
-        const totalMop = balancesToMOP(b);
+        const prim = accountPrimaryBalance(a);
         const item = document.createElement('div');
         item.className = 'account-grid-card';
         item.dataset.id = a.id;
         item.setAttribute('role', 'button');
         item.tabIndex = 0;
-        const negCls = totalMop < 0 ? ' neg' : '';
+        const negCls = prim.amount < 0 ? ' neg' : '';
         item.innerHTML = `
           <div class="account-grid-name">${escapeHtml(a.name)}</div>
-          <div class="account-grid-bal${negCls}">${money('MOP', totalMop)}</div>`;
+          <div class="account-grid-bal${negCls}">${money(prim.currency, prim.amount)}</div>`;
         container.appendChild(item);
       });
       container.querySelectorAll('.account-grid-card').forEach(item => {
@@ -5168,18 +5204,17 @@ function renderAccounts() {
     } else {
       if (noOther) noOther.style.display = 'none';
       otherAccounts.forEach(a => {
-        const b = a.balances || { MOP: 0, HKD: 0, CNY: 0 };
         const isWallet = a.type === '電子錢包';
-        const totalMop = balancesToMOP(b);
+        const prim = accountPrimaryBalance(a);
         const item = document.createElement('div');
         item.className = 'account-grid-card';
         item.dataset.id = a.id;
         item.setAttribute('role', 'button');
         item.tabIndex = 0;
-        const negCls = !isWallet && totalMop < 0 ? ' neg' : '';
+        const negCls = !isWallet && prim.amount < 0 ? ' neg' : '';
         item.innerHTML = `
           <div class="account-grid-name">${escapeHtml(a.name)}</div>
-          <div class="account-grid-bal${negCls}">${isWallet ? '—' : money('MOP', totalMop)}</div>`;
+          <div class="account-grid-bal${negCls}">${isWallet ? '—' : money(prim.currency, prim.amount)}</div>`;
         otherEl.appendChild(item);
       });
       otherEl.querySelectorAll('.account-grid-card').forEach(item => {
@@ -6727,13 +6762,6 @@ function mpfToHKD(a) {
   return convertAmount(Number(a.balance) || 0, mpfCurrency(a), 'HKD');
 }
 
-/** 總存款月度快照（本機）：key = YYYY-MM → 金額(MOP) */
-function loadDepositHistory() {
-  return loadJSON(DEPOSIT_HISTORY_KEY, {}) || {};
-}
-function saveDepositHistory(hist) {
-  saveJSON(DEPOSIT_HISTORY_KEY, hist);
-}
 function currentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -6744,44 +6772,135 @@ function prevMonthKey(key) {
   if (m < 1) { m = 12; y--; }
   return `${y}-${String(m).padStart(2, '0')}`;
 }
-/** 寫入／更新本月總存款快照（以目前計算值覆蓋） */
-function recordDepositSnapshot(deposit) {
-  try {
-    const hist = loadDepositHistory();
-    const key = currentMonthKey();
-    const rounded = Math.round(Number(deposit) * 100) / 100;
-    if (hist[key] !== rounded) {
-      hist[key] = rounded;
-      // 只保留最近 36 個月
-      const keys = Object.keys(hist).sort();
-      while (keys.length > 36) {
-        delete hist[keys.shift()];
-      }
-      saveDepositHistory(hist);
-    }
-  } catch (_) {}
+/** 指定年月的最後一天 YYYY-MM-DD（本地曆） */
+function endOfMonthStr(year, month0) {
+  const d = new Date(year, month0 + 1, 0);
+  return formatDateLocal(d);
 }
-/** 在資產頁總存款下方顯示 vs 上月 */
+
+/**
+ * 在「餘額副本」上套用 delta（不改真實 accounts）
+ * 規則與 applyBalanceDelta 一致：電子錢包略過
+ */
+function mapBalanceDelta(map, accountId, currency, delta) {
+  if (!accountId || !currency || !delta) return;
+  const acc = accounts.find(a => a.id === accountId);
+  if (acc && acc.type === '電子錢包') return;
+  if (!map[accountId]) map[accountId] = { MOP: 0, HKD: 0, CNY: 0 };
+  const cur = currency === 'HKD' || currency === 'CNY' ? currency : 'MOP';
+  map[accountId][cur] = Number(map[accountId][cur] || 0) + delta;
+}
+
+/** 將一筆紀錄的「反向效果」套到餘額副本（純計算，不改真實資料） */
+function reverseRecordOnMap(map, rec) {
+  if (!rec) return;
+  if (isSavings(rec)) return;
+  if (isInterest(rec)) {
+    mapBalanceDelta(map, rec.accountId, rec.currency, -(Number(rec.amount) || 0));
+    return;
+  }
+  if (isAdvance(rec)) {
+    const total = Number(rec.amount) || 0;
+    const recvAmt = Number(rec.recvAmount) || 0;
+    const payAcc = accounts.find(a => a.id === rec.accountId);
+    if (payAcc && payAcc.type === '信用卡') {
+      mapBalanceDelta(map, rec.accountId, rec.currency, -total);
+    } else {
+      mapBalanceDelta(map, rec.accountId, rec.currency, total);
+    }
+    if (rec.recvAccountId && recvAmt) {
+      mapBalanceDelta(map, rec.recvAccountId, rec.currency, -recvAmt);
+    }
+    return;
+  }
+  if (isTransfer(rec) || isCollectReceivable(rec)) {
+    mapBalanceDelta(map, rec.accountId, rec.currency, Number(rec.amount) || 0);
+    mapBalanceDelta(map, rec.toAccountId, rec.toCurrency || rec.currency, -(Number(rec.toAmount ?? rec.amount) || 0));
+    return;
+  }
+  const amt = Number(rec.amount) || 0;
+  if (isRepayment(rec)) {
+    mapBalanceDelta(map, rec.accountId, rec.currency, amt);
+    if (rec.repayToId) mapBalanceDelta(map, rec.repayToId, rec.currency, amt);
+    return;
+  }
+  // 一般收支：與 reverseRecordEffect 相同
+  let effectId = rec.accountId;
+  const acc0 = accounts.find(a => a.id === rec.accountId);
+  if (acc0 && acc0.type === '電子錢包' && acc0.linkedBankId) effectId = acc0.linkedBankId;
+  else if (rec.displayAccountId) effectId = rec.displayAccountId;
+  const acc = accounts.find(a => a.id === effectId);
+  if (!acc) return;
+  if (acc.type === '信用卡') {
+    mapBalanceDelta(map, effectId, rec.currency, rec.type === 'expense' ? -amt : amt);
+  } else {
+    mapBalanceDelta(map, effectId, rec.currency, rec.type === 'expense' ? amt : -amt);
+  }
+}
+
+/** 由餘額副本計算總存款（銀行+現金+投資+其他 − 扣減；不含強積金／信用卡／應收／錢包） */
+function calcDepositFromBalanceMap(map) {
+  let bankMop = 0, otherMop = 0;
+  accounts.forEach(a => {
+    if (a.type === '電子錢包' || a.type === '信用卡' || a.type === '應收帳款') return;
+    const b = map[a.id] || a.balances || {};
+    const mop = balancesToMOP(b);
+    if (a.type === '銀行') bankMop += mop;
+    else otherMop += mop;
+  });
+  let otherLiab = 0;
+  liabilities.forEach(l => { otherLiab += balancesToMOP(l.balances); });
+  return bankMop + otherMop - otherLiab;
+}
+
+/**
+ * 流水倒推：以目前戶口餘額為起點，
+ * 將「記帳日期 > asOfDate」的紀錄全部反向套用，得到 asOfDate 當日結束時的總存款。
+ * asOfDate: 'YYYY-MM-DD'
+ */
+function calcDepositAsOf(asOfDate) {
+  const map = {};
+  accounts.forEach(a => {
+    map[a.id] = {
+      MOP: Number(a.balances?.MOP) || 0,
+      HKD: Number(a.balances?.HKD) || 0,
+      CNY: Number(a.balances?.CNY) || 0
+    };
+  });
+  const cutoff = String(asOfDate || '').slice(0, 10);
+  if (!cutoff) return calcDepositFromBalanceMap(map);
+  records.forEach(r => {
+    const d = String(r.date || '').slice(0, 10);
+    if (d && d > cutoff) reverseRecordOnMap(map, r);
+  });
+  return calcDepositFromBalanceMap(map);
+}
+
+/** 上月月底總存款（流水倒推） */
+function calcPrevMonthDeposit() {
+  const now = new Date();
+  let y = now.getFullYear();
+  let m = now.getMonth() - 1; // 0-based
+  if (m < 0) { m = 11; y--; }
+  const asOf = endOfMonthStr(y, m);
+  return { year: y, month: m, asOf, deposit: calcDepositAsOf(asOf) };
+}
+
+/** 相容舊呼叫：不再寫快照 */
+function recordDepositSnapshot(_deposit) { /* no-op：改為流水倒推 */ }
+
+/** 在資產頁總存款下方顯示 vs 上月（流水倒推） */
 function renderDepositMom(deposit) {
   const el = $('#assets-deposit-mom');
   if (!el) return;
-  const hist = loadDepositHistory();
-  const curKey = currentMonthKey();
-  const prevKey = prevMonthKey(curKey);
-  const prevVal = hist[prevKey];
-  if (prevVal == null || Number.isNaN(Number(prevVal))) {
-    el.innerHTML = '<span class="mom-prev">尚無上月總存款紀錄（下月起可對比）</span>';
-    return;
-  }
-  const prev = Number(prevVal);
+  const prev = calcPrevMonthDeposit();
   const cur = Number(deposit) || 0;
-  const d = formatMomDelta(cur, prev, false);
-  // 存款增加為好 → up 用綠色
-  const cls = d.cls === 'flat' ? 'flat' : (cur >= prev ? 'up' : 'down');
-  const [py, pm] = prevKey.split('-');
+  const prevVal = Number(prev.deposit) || 0;
+  const d = formatMomDelta(cur, prevVal, false);
+  const cls = d.cls === 'flat' ? 'flat' : (cur >= prevVal ? 'up' : 'down');
   el.innerHTML = `
     <span class="mom-delta ${cls}">${d.text}</span>
-    <span class="mom-prev">上月（${Number(py)}/${Number(pm)}）總存款 ${money('MOP', prev)}</span>`;
+    <span class="mom-prev">上月（${prev.year}/${prev.month + 1}）總存款 ${money('MOP', prevVal)} · 流水倒推至 ${prev.asOf}</span>`;
 }
 
 function renderAssets() {
