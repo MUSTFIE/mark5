@@ -390,6 +390,26 @@ header h1 {
   box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
 .day-group-body .record-item:last-child { border-bottom: none; }
+.day-group-body .ledger-item {
+  background: rgba(255,255,255,0.7); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 6px; border-bottom: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.day-group-body .ledger-item:last-child { border-bottom: none; margin-bottom: 0; }
+.ledger-month-group .day-group-stats .inc { color: var(--income); }
+.ledger-month-group .day-group-stats .exp { color: var(--expense); }
+.ledger-month-group .day-group-stats {
+  flex-wrap: wrap; justify-content: flex-end; gap: 6px 10px;
+  font-size: 0.72rem;
+}
+.account-detail-ledger .day-group { margin-bottom: 8px; }
+.account-detail-ledger .ledger-empty { padding: 16px 8px; text-align: center; }
+@media (max-width: 400px) {
+  .ledger-month-group .day-group-header {
+    flex-direction: column; align-items: flex-start; gap: 6px;
+  }
+  .ledger-month-group .day-group-stats { justify-content: flex-start; }
+}
 .day-header { font-size: 0.8rem; color: var(--muted); padding: 4px 0; }
 
 /* ===== Forms / Modal ===== */
@@ -1331,6 +1351,7 @@ form { padding: 14px 18px 20px; }
 [data-theme="dark"] .day-group.day-alt-0 { background: var(--card); }
 [data-theme="dark"] .day-group.day-alt-1 { background: rgba(99, 102, 241, 0.08); }
 [data-theme="dark"] .day-group-body .record-item { background: rgba(30, 41, 59, 0.7); }
+[data-theme="dark"] .day-group-body .ledger-item { background: rgba(30, 41, 59, 0.7); }
 [data-theme="dark"] .type-group { background: #0F172A; }
 [data-theme="dark"] .type-group-toggle { background: #1E293B; }
 [data-theme="dark"] .month-stat { background: #1E293B; }
@@ -2001,10 +2022,7 @@ form { padding: 14px 18px 20px; }
  <button type="button" id="btn-account-detail-edit" class="btn">✎ 編輯</button>
  <button type="button" id="btn-account-detail-delete" class="btn danger-outline">刪除</button>
  </div>
- <div class="ledger-filter account-detail-filter">
- <label>流水月份</label>
- <select id="account-detail-month"></select>
- </div>
+ <div class="ledger-title" style="margin:4px 0 8px">流水帳（按月份展開）</div>
  <div id="account-detail-ledger" class="account-detail-ledger"></div>
  </div>
  </div>
@@ -5239,12 +5257,6 @@ function openAccountDetailModal(accountId) {
   }
   $('#account-detail-summary').innerHTML = summary;
 
-  const monthSel = $('#account-detail-month');
-  const months = ledgerMonthOptions(a.id, isWallet);
-  const curMonth = ledgerFilterMonth || '';
-  monthSel.innerHTML = `<option value="">全部</option>` + months.map(m =>
-    `<option value="${m}" ${m === curMonth ? 'selected' : ''}>${m}</option>`).join('');
-
   const editBtn = $('#btn-account-detail-edit');
   const delBtn = $('#btn-account-detail-delete');
   editBtn.onclick = () => {
@@ -5262,17 +5274,31 @@ function openAccountDetailModal(accountId) {
     if (currentPage === 'assets') renderAssets(); else renderAccounts();
   };
 
-  monthSel.onchange = () => {
-    ledgerFilterMonth = monthSel.value;
-    renderAccountDetailLedger(a.id);
-  };
-
   renderAccountDetailLedger(a.id);
   overlay.classList.remove('hidden');
 }
 
 function closeAccountDetailModal() {
   $('#account-detail-modal-overlay')?.classList.add('hidden');
+}
+
+function buildLedgerItemHtml(r, accountId, isWallet) {
+  const view = ledgerAmountView(r, accountId);
+  const via = r.viaWalletId ? accounts.find(w => w.id === r.viaWalletId) : null;
+  const other = isTransfer(r)
+    ? (r.toAccountId === accountId
+        ? accounts.find(x => x.id === r.accountId)
+        : accounts.find(x => x.id === r.toAccountId))
+    : null;
+  const extra = isTransfer(r) && other
+    ? ` · ${r.toAccountId === accountId ? '自' : '至'} ${escapeHtml(other.name)}`
+    : (via && !isWallet ? ' · ' + escapeHtml(via.name) : '');
+  return `<div class="ledger-item" data-id="${r.id}" role="button" tabindex="0">
+    <span class="ledger-item-left">${r.date}<br><span class="account-meta">${escapeHtml(r.category)}${extra}${r.note ? ' · ' + escapeHtml(r.note) : ''}</span></span>
+    <span class="ledger-item-right">
+      <span class="record-amount ${view.cls}">${view.sign}${money(view.currency, view.amount)}</span>
+    </span>
+  </div>`;
 }
 
 function renderAccountDetailLedger(accountId) {
@@ -5283,37 +5309,65 @@ function renderAccountDetailLedger(accountId) {
   let ledger;
   if (isWallet) {
     ledger = records
-      .filter(r => {
-        if (r.viaWalletId !== a.id) return false;
-        if (ledgerFilterMonth && String(r.date || '').slice(0, 7) !== ledgerFilterMonth) return false;
-        return true;
-      })
+      .filter(r => r.viaWalletId === a.id)
       .sort(sortByInputTime);
   } else {
-    ledger = getAccountLedger(a.id, ledgerFilterMonth);
+    ledger = getAccountLedger(a.id, '');
   }
   if (!ledger.length) {
-    box.innerHTML = '<div class="ledger-empty">此條件下尚無流水紀錄</div>';
+    box.innerHTML = '<div class="ledger-empty">尚無流水紀錄</div>';
     return;
   }
-  box.innerHTML = ledger.slice(0, 100).map(r => {
-    const view = ledgerAmountView(r, a.id);
-    const via = r.viaWalletId ? accounts.find(w => w.id === r.viaWalletId) : null;
-    const other = isTransfer(r)
-      ? (r.toAccountId === a.id
-          ? accounts.find(x => x.id === r.accountId)
-          : accounts.find(x => x.id === r.toAccountId))
-      : null;
-    const extra = isTransfer(r) && other
-      ? ` · ${r.toAccountId === a.id ? '自' : '至'} ${escapeHtml(other.name)}`
-      : (via && !isWallet ? ' · ' + escapeHtml(via.name) : '');
-    return `<div class="ledger-item" data-id="${r.id}" role="button" tabindex="0">
-      <span class="ledger-item-left">${r.date}<br><span class="account-meta">${escapeHtml(r.category)}${extra}${r.note ? ' · ' + escapeHtml(r.note) : ''}</span></span>
-      <span class="ledger-item-right">
-        <span class="record-amount ${view.cls}">${view.sign}${money(view.currency, view.amount)}</span>
-      </span>
+  // 依月份分組（新→舊）
+  const byMonth = {};
+  ledger.forEach(r => {
+    const m = String(r.date || '').slice(0, 7);
+    if (!m || m.length < 7) return;
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(r);
+  });
+  const months = Object.keys(byMonth).sort((x, y) => y.localeCompare(x));
+  if (!months.length) {
+    box.innerHTML = '<div class="ledger-empty">尚無流水紀錄</div>';
+    return;
+  }
+  const newest = months[0];
+  let html = '';
+  months.forEach((m, idx) => {
+    const items = byMonth[m];
+    let netMop = 0;
+    let inMop = 0;
+    let outMop = 0;
+    items.forEach(r => {
+      const view = ledgerAmountView(r, a.id);
+      const mop = toMOP(Number(view.amount) || 0, view.currency);
+      if (view.sign === '+') {
+        inMop += mop;
+        netMop += mop;
+      } else {
+        outMop += mop;
+        netMop -= mop;
+      }
+    });
+    const [y, mo] = m.split('-');
+    const label = `${y}年${Number(mo)}月`;
+    const expanded = m === newest;
+    const netCls = netMop > 0.009 ? 'inc' : netMop < -0.009 ? 'exp' : '';
+    const netSign = netMop > 0.009 ? '+' : '';
+    const statsHtml = `<span class="inc">+${formatMoney(inMop)}</span>
+      <span class="exp">−${formatMoney(outMop)}</span>
+      <span class="${netCls}">月結餘 ${netSign}${money('MOP', netMop)}</span>`;
+    html += `<div class="day-group ledger-month-group${expanded ? ' expanded' : ''} day-alt-${idx % 2}">
+      <button type="button" class="day-group-header">
+        <span class="day-group-title"><span class="day-chevron">▾</span> ${label} <span class="account-meta">（${items.length}）</span></span>
+        <span class="day-group-stats">${statsHtml}</span>
+      </button>
+      <div class="day-group-body">
+        ${items.map(r => buildLedgerItemHtml(r, a.id, isWallet)).join('')}
+      </div>
     </div>`;
-  }).join('');
+  });
+  box.innerHTML = html;
   bindRecordActions(box);
 }
 
