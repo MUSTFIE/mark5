@@ -1188,6 +1188,198 @@ form { padding: 14px 18px 20px; }
   #mpf-accounts-list.accounts-grid { grid-template-columns: 1fr; }
 }
 
+
+/* ===== 自訂分類管理 ===== */
+const CUSTOM_CATEGORIES_KEY = 'accounting_custom_categories_v1';
+let customCategories = []; // { name, icon }[]
+
+function loadCustomCategories() {
+  const list = loadJSON(CUSTOM_CATEGORIES_KEY, []);
+  return Array.isArray(list) ? list.filter(c => c && typeof c.name === 'string' && c.name.trim()) : [];
+}
+function saveCustomCategories(list) {
+  customCategories = list;
+  writeLocalOnly(CUSTOM_CATEGORIES_KEY, list);
+  rebuildCategoryIcons();
+}
+function rebuildCategoryIcons() {
+  CATEGORIES.forEach(c => { CATEGORY_ICONS[c.name] = c.icon; });
+  customCategories.forEach(c => {
+    if (c.name) CATEGORY_ICONS[c.name] = c.icon || '🏷️';
+  });
+}
+/** 內建 + 自訂（去重，其他置底） */
+function getAllCategories() {
+  const seen = new Set();
+  const out = [];
+  const push = (name, icon, builtin) => {
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    out.push({ name, icon: icon || CATEGORY_ICONS[name] || '🏷️', builtin: !!builtin });
+  };
+  CATEGORIES.forEach(c => push(c.name, c.icon, true));
+  customCategories.forEach(c => push(c.name, c.icon || '🏷️', false));
+  const idx = out.findIndex(c => c.name === '其他');
+  if (idx >= 0 && idx !== out.length - 1) {
+    const [oth] = out.splice(idx, 1);
+    out.push(oth);
+  }
+  return out;
+}
+function isBuiltinCategory(name) {
+  return CATEGORIES.some(c => c.name === name);
+}
+/** 記帳時若用「其他」輸入新名稱，自動加入自訂分類 */
+function ensureCustomCategory(name, icon) {
+  const n = (name || '').trim();
+  if (!n || n === '其他' || isBuiltinCategory(n)) return;
+  if (customCategories.some(c => c.name === n)) return;
+  customCategories = [...customCategories, { name: n, icon: icon || '🏷️' }];
+  saveCustomCategories(customCategories);
+}
+function populateRecordCategorySelect(selected) {
+  const sel = $('#category');
+  if (!sel) return;
+  const all = getAllCategories();
+  const prev = selected != null ? selected : sel.value;
+  sel.innerHTML = all.map(c =>
+    `<option value="${c.name}">${c.icon} ${c.name}</option>`
+  ).join('');
+  if (prev && [...sel.options].some(o => o.value === prev)) {
+    sel.value = prev;
+  } else if (prev && !isBuiltinCategory(prev) && !customCategories.some(c => c.name === prev)) {
+    if ([...sel.options].some(o => o.value === '其他')) sel.value = '其他';
+  }
+}
+function populateCategorySelectEl(sel, opts) {
+  if (!sel) return;
+  const {
+    selected = '',
+    includeOther = true,
+    exclude = []
+  } = opts || {};
+  const excl = new Set(exclude);
+  let all = getAllCategories().filter(c => !excl.has(c.name));
+  if (!includeOther) all = all.filter(c => c.name !== '其他');
+  sel.innerHTML = all.map(c =>
+    `<option value="${c.name}">${c.icon} ${c.name}</option>`
+  ).join('');
+  if (selected && [...sel.options].some(o => o.value === selected)) sel.value = selected;
+}
+
+function openCategoriesModal() {
+  renderCategoriesManageList();
+  $('#categories-modal-overlay')?.classList.remove('hidden');
+}
+function closeCategoriesModal() {
+  $('#categories-modal-overlay')?.classList.add('hidden');
+}
+function renderCategoriesManageList() {
+  const box = $('#categories-manage-list');
+  const empty = $('#no-custom-categories');
+  if (!box) return;
+  const builtin = CATEGORIES.filter(c => c.name !== '其他');
+  const custom = customCategories;
+  let html = '';
+  if (builtin.length) {
+    html += `<div class="field-hint" style="margin:4px 0 6px;font-weight:650">內建分類</div>`;
+    html += builtin.map(c => `
+      <div class="goal-card" style="opacity:.92">
+        <div class="goal-card-header">
+          <div>
+            <div class="goal-card-name">${c.icon} ${escapeHtml(c.name)}</div>
+            <div class="goal-card-meta">系統內建</div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  if (custom.length) {
+    html += `<div class="field-hint" style="margin:12px 0 6px;font-weight:650">自訂分類</div>`;
+    html += custom.map(c => `
+      <div class="goal-card">
+        <div class="goal-card-header">
+          <div>
+            <div class="goal-card-name">${escapeHtml(c.icon || '🏷️')} ${escapeHtml(c.name)}</div>
+            <div class="goal-card-meta">自訂</div>
+          </div>
+          <div class="goal-card-actions">
+            <button type="button" class="edit-cat" data-name="${escapeHtml(c.name)}">編輯</button>
+            <button type="button" class="delete delete-cat" data-name="${escapeHtml(c.name)}">刪除</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  box.innerHTML = html;
+  if (empty) empty.style.display = custom.length ? 'none' : 'block';
+  box.querySelectorAll('.edit-cat').forEach(btn => {
+    btn.addEventListener('click', () => openCategoryEditModal(btn.dataset.name));
+  });
+  box.querySelectorAll('.delete-cat').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.name;
+      if (!confirm(`確定刪除分類「${name}」？\n（既有紀錄的分類名稱不會改變）`)) return;
+      customCategories = customCategories.filter(c => c.name !== name);
+      saveCustomCategories(customCategories);
+      renderCategoriesManageList();
+      populateRecordCategorySelect();
+      toast('已刪除分類', 'ok');
+    });
+  });
+}
+function openCategoryEditModal(editName) {
+  const existing = editName ? customCategories.find(c => c.name === editName) : null;
+  $('#category-edit-title').textContent = existing ? '編輯分類' : '新增分類';
+  $('#cat-edit-old-name').value = existing ? existing.name : '';
+  $('#cat-edit-name').value = existing ? existing.name : '';
+  $('#cat-edit-icon').value = existing ? (existing.icon || '') : '';
+  $('#category-edit-overlay')?.classList.remove('hidden');
+  setTimeout(() => $('#cat-edit-name')?.focus(), 80);
+}
+function closeCategoryEditModal() {
+  $('#category-edit-overlay')?.classList.add('hidden');
+}
+function handleCategoryEditSubmit(e) {
+  e.preventDefault();
+  const oldName = ($('#cat-edit-old-name').value || '').trim();
+  const name = ($('#cat-edit-name').value || '').trim();
+  let icon = ($('#cat-edit-icon').value || '').trim() || '🏷️';
+  if (icon.length > 4) icon = [...icon][0] || '🏷️';
+  if (!name) { alert('請輸入分類名稱'); return; }
+  if (name === '其他') { alert('「其他」為系統保留名稱'); return; }
+  if (isBuiltinCategory(name) && name !== oldName) {
+    alert('此名稱與內建分類重複');
+    return;
+  }
+  const dup = customCategories.find(c => c.name === name && c.name !== oldName);
+  if (dup) { alert('已有相同名稱的自訂分類'); return; }
+
+  if (oldName) {
+    const idx = customCategories.findIndex(c => c.name === oldName);
+    if (idx >= 0) {
+      customCategories[idx] = { name, icon };
+      if (name !== oldName) {
+        let n = 0;
+        records.forEach(r => {
+          if (r.category === oldName) { r.category = name; n++; }
+        });
+        if (n > 0) {
+          saveRecordsLocal();
+          if (typeof queueRecordsFullSync === 'function') queueRecordsFullSync();
+        }
+      }
+    } else {
+      customCategories.push({ name, icon });
+    }
+  } else {
+    customCategories.push({ name, icon });
+  }
+  saveCustomCategories(customCategories);
+  closeCategoryEditModal();
+  renderCategoriesManageList();
+  populateRecordCategorySelect();
+  toast(oldName ? '已更新分類' : '已新增分類', 'ok');
+}
+
 /* ===== 本月 vs 上月 ===== */
 .mom-compare {
   display: grid;
@@ -1779,8 +1971,51 @@ form { padding: 14px 18px 20px; }
  <button type="button" id="btn-settings-export" class="settings-menu-item">⬇　匯出 / 備份</button>
  <button type="button" id="btn-settings-rates" class="settings-menu-item">💱　匯率設定</button>
  <button type="button" id="btn-settings-templates" class="settings-menu-item">⚡　常用模板</button>
+ <button type="button" id="btn-settings-categories" class="settings-menu-item">🏷️　分類管理</button>
  <button type="button" id="btn-toggle-theme" class="settings-menu-item">🌙　深色模式</button>
  </div>
+ </div>
+ </div>
+
+ <!-- 分類管理 -->
+ <div id="categories-modal-overlay" class="modal-overlay hidden">
+ <div class="modal modal-sheet">
+ <div class="modal-header">
+ <h3>分類管理</h3>
+ <button type="button" id="btn-close-categories" class="btn-icon">×</button>
+ </div>
+ <div class="account-detail-body">
+ <p class="field-hint" style="margin-bottom:10px">內建分類不可刪除；可新增常用自訂分類，會出現在記帳表單選單中。</p>
+ <div id="categories-manage-list" class="goal-list"></div>
+ <div id="no-custom-categories" class="empty-hint">尚未新增自訂分類</div>
+ <button type="button" id="btn-add-category" class="btn primary" style="width:100%;margin-top:12px">＋ 新增分類</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 新增／編輯自訂分類 -->
+ <div id="category-edit-overlay" class="modal-overlay hidden">
+ <div class="modal">
+ <div class="modal-header">
+ <h3 id="category-edit-title">新增分類</h3>
+ <button type="button" id="btn-close-category-edit" class="btn-icon">×</button>
+ </div>
+ <form id="category-edit-form">
+ <input type="hidden" id="cat-edit-old-name">
+ <div class="form-row">
+ <label for="cat-edit-name">分類名稱</label>
+ <input type="text" id="cat-edit-name" placeholder="例如：訂閱、寵物" required maxlength="20">
+ </div>
+ <div class="form-row">
+ <label for="cat-edit-icon">圖示（Emoji）</label>
+ <input type="text" id="cat-edit-icon" placeholder="🏷️" maxlength="4">
+ <p class="field-hint">可直接貼上 Emoji，空白則使用 🏷️</p>
+ </div>
+ <div class="form-actions">
+ <button type="button" id="btn-cancel-category-edit" class="btn">取消</button>
+ <button type="submit" class="btn primary">儲存</button>
+ </div>
+ </form>
  </div>
  </div>
 
@@ -2832,8 +3067,9 @@ function applyTemplate(id) {
   $$('#record-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
   if (t.amount > 0) $('#amount').value = t.amount;
   if (t.currency) $('#currency').value = t.currency;
-  const preset = CATEGORIES.map(c => c.name);
-  if (preset.includes(t.category)) {
+  populateRecordCategorySelect();
+  const allNames = getAllCategories().map(c => c.name);
+  if (t.category && allNames.includes(t.category)) {
     $('#category').value = t.category;
     $('#custom-category-row')?.classList.add('hidden');
   } else if (t.category) {
@@ -2908,10 +3144,7 @@ function openTemplateEditModal(editId) {
   });
   const catSel = $('#tpl-category');
   if (catSel) {
-    catSel.innerHTML = CATEGORIES.map(c =>
-      `<option value="${c.name}">${c.icon} ${c.name}</option>`
-    ).join('');
-    if (t?.category) catSel.value = t.category;
+    populateCategorySelectEl(catSel, { selected: t?.category || '', includeOther: true });
   }
   const accSel = $('#tpl-account');
   if (accSel) {
@@ -5637,7 +5870,7 @@ function openAddModal() {
   currentType = 'expense';
   $$('.type-btn').forEach(b => b.classList.remove('active'));
   $('.type-btn[data-type="expense"]').classList.add('active');
-  $('#category').value = '餐飲';
+  populateRecordCategorySelect('餐飲');
   $('#custom-category-row').classList.add('hidden');
   $('#repay-to-row').classList.add('hidden');
   if ($('#is-advance')) $('#is-advance').checked = false;
@@ -5678,14 +5911,15 @@ function openEditModal(id) {
   const tb = $(`.type-btn[data-type="${r.type}"]`);
   if (tb) tb.classList.add('active');
 
-  const preset = CATEGORIES.map(c => c.name);
-  if (preset.includes(r.category)) {
+  populateRecordCategorySelect();
+  const allNames = getAllCategories().map(c => c.name);
+  if (r.category && allNames.includes(r.category)) {
     $('#category').value = r.category;
     $('#custom-category-row').classList.add('hidden');
   } else {
     $('#category').value = '其他';
     $('#custom-category-row').classList.remove('hidden');
-    $('#custom-category').value = r.category;
+    $('#custom-category').value = r.category || '';
   }
   onCategoryChange();
   populateAccountSelect(r.viaWalletId || r.accountId || '');
@@ -5737,6 +5971,7 @@ function handleRecordSubmit(e) {
     let category = $('#category').value;
     if (category === '其他') {
       category = $('#custom-category').value.trim() || '其他';
+      if (category && category !== '其他') ensureCustomCategory(category);
     }
     const date = $('#date').value;
     const note = ($('#note').value || '').trim();
@@ -5787,6 +6022,7 @@ function handleRecordSubmit(e) {
   if (category === '其他') {
     category = $('#custom-category').value.trim();
     if (!category) { alert('請輸入自訂分類'); return; }
+    ensureCustomCategory(category);
   }
   let repayToId = '';
   if (category === '信用卡還款') {
@@ -6070,7 +6306,7 @@ function autoFillTransferToAmount() {
 }
 function openTransferModal(editId = '') {
   const list = nonCcAccounts();
-  if (list.length < 2) { alert('至少需要兩個非信用卡／非電子錢包戶口才能轉帳'); return; }
+  if (!list.length) { alert('至少需要一個非信用卡／非電子錢包戶口才能轉帳'); return; }
   const fromSel = $('#transfer-from');
   const toSel = $('#transfer-to');
   fromSel.innerHTML = '';
@@ -6112,7 +6348,6 @@ function handleTransferSubmit(e) {
   e.preventDefault();
   const fromId = $('#transfer-from').value;
   const toId = $('#transfer-to').value;
-  if (fromId === toId) { alert('轉出與轉入戶口不能相同'); return; }
   const editId = $('#transfer-edit-id').value;
   const old = editId ? records.find(r => r.id === editId) : null;
   const record = {
@@ -6267,7 +6502,7 @@ function renderBudgetPanel() {
   }
   const exclude = new Set(['信用卡還款', '收回應收', '代墊', '利息收入', '存錢', '戶口調整', '內部轉帳']);
   const allCats = [...new Set([
-    ...CATEGORIES.map(c => c.name).filter(n => !exclude.has(n)),
+    ...getAllCategories().map(c => c.name).filter(n => !exclude.has(n)),
     ...(budget.categories || [])
   ])];
   getMonthRecords().forEach(r => {
@@ -6421,8 +6656,10 @@ function openAdvanceModal() {
   });
   const catSel = $('#advance-category');
   if (catSel) {
-    catSel.innerHTML = CATEGORIES.filter(c => !['信用卡還款','收回應收','代墊','利息收入'].includes(c.name))
-      .map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+    populateCategorySelectEl(catSel, {
+      exclude: ['信用卡還款', '收回應收', '代墊', '利息收入', '存錢', '戶口調整'],
+      includeOther: true
+    });
   }
   $('#advance-modal-overlay').classList.remove('hidden');
 }
@@ -7336,6 +7573,7 @@ async function clearAllData() {
   mpfData = { accounts: [] };
   rates = { ...DEFAULT_RATES };
   budget = { amount: 0, categories: [], savingsGoal: 0, goals: [] };
+  customCategories = [];
   filters = { type: '', category: '', account: '', currency: '' };
   expandedAccountId = null;
   expandedAccountTypes = new Set();
@@ -7347,12 +7585,13 @@ async function clearAllData() {
     // 取消尚未寫入的佇列，避免清空後又被 flush 寫回舊資料
     const keysToClear = [
       STORAGE_KEY, ACCOUNTS_KEY, LIABILITIES_KEY, MPF_KEY, RATES_KEY, BUDGET_KEY,
-      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY
+      CUSTOM_CAT_SUM_KEY, YEAR_CUSTOM_CAT_SUM_KEY, CUSTOM_CATEGORIES_KEY
     ].map(k => scopedKey(k));
     _cancelScheduledLocalFlush();
     keysToClear.forEach(k => _localWriteQueue.delete(k));
     keysToClear.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
+  rebuildCategoryIcons();
 
   // 雲端同步清空（若已登入）
   if (firebaseReady && currentUser && db) {
@@ -7390,7 +7629,8 @@ function exportBackup() {
   const data = {
     version: 3,
     exportedAt: new Date().toISOString(),
-    records, accounts, liabilities, mpfData, rates, budget
+    records, accounts, liabilities, mpfData, rates, budget,
+    customCategories
   };
   downloadFile(`記帳備份_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(data, null, 2), 'application/json');
   $('#export-modal-overlay').classList.add('hidden');
@@ -7416,6 +7656,9 @@ function importBackup(e) {
       mpfData = data.mpfData || { accounts: [] };
       rates = data.rates ? { ...DEFAULT_RATES, ...data.rates, MOP: 1 } : rates;
       budget = normalizeBudget(data.budget || { amount: 0, categories: [] });
+      if (Array.isArray(data.customCategories)) {
+        saveCustomCategories(data.customCategories.filter(c => c && c.name));
+      }
       saveJSON(STORAGE_KEY, records);
       saveJSON(ACCOUNTS_KEY, accounts);
       saveJSON(LIABILITIES_KEY, liabilities);
@@ -7550,7 +7793,21 @@ function init() {
   $('#btn-settings-export')?.addEventListener('click', () => { closeMonthlySettings(); $('#export-modal-overlay').classList.remove('hidden'); });
   $('#btn-settings-rates')?.addEventListener('click', () => { closeMonthlySettings(); openRatesModal(); });
   $('#btn-settings-templates')?.addEventListener('click', () => { closeMonthlySettings(); openTemplatesModal(); });
+  $('#btn-settings-categories')?.addEventListener('click', () => { closeMonthlySettings(); openCategoriesModal(); });
   $('#btn-toggle-theme')?.addEventListener('click', () => { toggleTheme(); });
+
+  // 分類管理 modal
+  $('#btn-close-categories')?.addEventListener('click', closeCategoriesModal);
+  $('#categories-modal-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'categories-modal-overlay') closeCategoriesModal();
+  });
+  $('#btn-add-category')?.addEventListener('click', () => openCategoryEditModal());
+  $('#btn-close-category-edit')?.addEventListener('click', closeCategoryEditModal);
+  $('#btn-cancel-category-edit')?.addEventListener('click', closeCategoryEditModal);
+  $('#category-edit-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'category-edit-overlay') closeCategoryEditModal();
+  });
+  $('#category-edit-form')?.addEventListener('submit', handleCategoryEditSubmit);
 
   // 常用模板 modal
   $('#btn-close-templates')?.addEventListener('click', closeTemplatesModal);
@@ -7849,6 +8106,11 @@ function init() {
   updateOfflineBanner();
   ensureGlobalRecordDelegation();
   try { templates = loadTemplates(); } catch (_) { templates = DEFAULT_TEMPLATES.map(t => ({ ...t })); }
+  try {
+    customCategories = loadCustomCategories();
+    rebuildCategoryIcons();
+    populateRecordCategorySelect();
+  } catch (_) { customCategories = []; }
   initTheme();
   accrueDailyInterest();
   startInterestAutoAccrue();
