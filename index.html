@@ -1314,6 +1314,91 @@ form { padding: 14px 18px 20px; }
 .piggy-wrap.done .piggy-svg { animation: pig-bounce 0.8s ease infinite; }
 
 
+
+/* ===== Quick add menu (長按＋) ===== */
+.quick-add-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  background: rgba(0,0,0,.4);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.quick-add-overlay.hidden { display: none !important; }
+.quick-add-sheet {
+  width: 100%; max-width: 440px;
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-lg);
+  animation: pageIn .2s ease;
+}
+.quick-add-sheet h3 {
+  font-size: 0.95rem; font-weight: 700; margin-bottom: 10px;
+  text-align: center; color: var(--muted);
+}
+.quick-add-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.quick-add-btn {
+  min-height: 56px; border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--text);
+  transition: transform .12s ease, background .12s ease;
+}
+.quick-add-btn:active { transform: scale(0.97); }
+.quick-add-btn.qa-expense { color: var(--expense); border-color: rgba(244,63,94,.3); background: rgba(244,63,94,.08); }
+.quick-add-btn.qa-income { color: var(--income); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.1); }
+.quick-add-btn.qa-transfer { color: var(--primary); border-color: rgba(79,70,229,.3); background: var(--primary-soft); }
+.quick-add-btn.qa-savings { color: #d97706; border-color: rgba(217,119,6,.3); background: rgba(217,119,6,.1); }
+.quick-add-cancel {
+  width: 100%; margin-top: 10px; min-height: 44px;
+  border: none; background: transparent; color: var(--muted);
+  font-weight: 650; font-size: 0.9rem; cursor: pointer;
+}
+
+/* ===== Filter chips ===== */
+.filter-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 10px; align-items: center;
+}
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  font-size: 0.78rem; font-weight: 650;
+  cursor: pointer; color: var(--text);
+  touch-action: manipulation;
+  transition: all .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-chip.active {
+  background: var(--primary-soft);
+  border-color: rgba(79,70,229,.4);
+  color: var(--primary);
+  font-weight: 750;
+}
+.filter-chip.chip-expense.active { background: rgba(244,63,94,.1); border-color: rgba(244,63,94,.35); color: var(--expense); }
+.filter-chip.chip-income.active { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); color: var(--income); }
+.filter-chip.chip-clear {
+  border-style: dashed; color: var(--muted);
+}
+.filter-chip .chip-x { font-size: 0.7rem; opacity: 0.7; margin-left: 2px; }
+
+/* ===== Clickable bars ===== */
+.bar-row.clickable { cursor: pointer; border-radius: 10px; padding: 4px 2px; transition: background .12s; }
+.bar-row.clickable:active, .bar-row.clickable:hover { background: rgba(79,70,229,.06); }
+.bar-row.clickable .bar-label { color: var(--primary); }
+
+/* copy last btn in page-actions */
+.page-actions .btn-copy-last { flex: 0 0 auto; min-width: 0; }
+
+[data-theme="dark"] .quick-add-sheet { background: var(--card); }
+[data-theme="dark"] .quick-add-btn { background: #1E293B; }
+[data-theme="dark"] .bar-row.clickable:active,
+[data-theme="dark"] .bar-row.clickable:hover { background: rgba(99,102,241,.12); }
 /* ===== Pin / sort accounts ===== */
 .account-grid-card.pinned {
   border-color: rgba(79, 70, 229, 0.45);
@@ -1479,6 +1564,7 @@ form { padding: 14px 18px 20px; }
  <p class="summary-hint">結餘＝收入−消費支出−存錢　｜　現金流結餘＝收入−實際支出−存錢</p>
  <div class="page-actions">
  <button type="button" id="btn-add" class="btn primary">＋ 新增</button>
+ <button type="button" id="btn-copy-last" class="btn btn-copy-last" title="複製上筆">📋 上筆</button>
  </div>
  <div id="templates-bar" class="templates-bar" aria-label="常用紀錄"></div>
  <div class="stack-col">
@@ -1487,6 +1573,7 @@ form { padding: 14px 18px 20px; }
  <h3>本月紀錄</h3>
  <button type="button" id="btn-toggle-filter" class="btn btn-sm">篩選</button>
  </div>
+ <div id="filter-chips" class="filter-chips" aria-label="快速篩選"></div>
  <div id="filter-panel" class="filter-panel hidden">
  <div class="filter-row">
  <label>類型</label>
@@ -1818,6 +1905,20 @@ form { padding: 14px 18px 20px; }
  </div>
 
  
+ <!-- 長按＋快捷選單 -->
+ <div id="quick-add-overlay" class="quick-add-overlay hidden" role="dialog" aria-label="快捷新增">
+ <div class="quick-add-sheet">
+ <h3>快捷新增</h3>
+ <div class="quick-add-grid">
+ <button type="button" class="quick-add-btn qa-expense" data-qa="expense">支出</button>
+ <button type="button" class="quick-add-btn qa-income" data-qa="income">收入</button>
+ <button type="button" class="quick-add-btn qa-transfer" data-qa="transfer">轉帳</button>
+ <button type="button" class="quick-add-btn qa-savings" data-qa="savings">存錢</button>
+ </div>
+ <button type="button" class="quick-add-cancel" id="btn-quick-add-cancel">取消</button>
+ </div>
+ </div>
+
  <!-- 記帳頁設定 -->
  <div id="settings-monthly-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
@@ -3955,15 +4056,47 @@ function renderBarList(container, items) {
     const share = ((Math.abs(item.value) / sum) * 100).toFixed(1);
     const color = item.color || BAR_COLORS[idx % BAR_COLORS.length];
     const row = document.createElement('div');
-    row.className = 'bar-row';
+    const clickable = !!(item.category || item.onClick);
+    row.className = 'bar-row' + (clickable ? ' clickable' : '');
+    if (item.category) row.dataset.category = item.category;
     row.innerHTML = `
       <div class="bar-row-top">
         <span class="bar-label">${item.label}</span>
         <span class="bar-val">MOP ${formatMoney(item.value)}（${share}%）</span>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+    if (clickable) {
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+      const go = () => {
+        if (typeof item.onClick === 'function') item.onClick();
+        else if (item.category) jumpToCategoryRecords(item.category);
+      };
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+      });
+    }
     container.appendChild(row);
   });
+}
+
+/** 點分類 bar → 記帳頁並套用該分類篩選 */
+function jumpToCategoryRecords(category) {
+  if (!category) return;
+  filters = { type: '', category: String(category), account: '', currency: '' };
+  // 同步進階篩選面板
+  const ft = $('#filter-type'); if (ft) ft.value = '';
+  const fc = $('#filter-category'); if (fc) fc.value = category;
+  const fa = $('#filter-account'); if (fa) fa.value = '';
+  const fcur = $('#filter-currency'); if (fcur) fcur.value = '';
+  switchPage('monthly');
+  toast(`已篩選：${category}`, 'ok');
+  // 捲到紀錄區
+  setTimeout(() => {
+    const sec = document.querySelector('#page-monthly .records-section');
+    if (sec) try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+  }, 80);
 }
 
 function initFirebase() {
@@ -4978,6 +5111,7 @@ function renderMonthly() {
   }
   populateFilterOptions();
   renderMonthRecords();
+  renderFilterChips();
   renderTemplatesBar();
 }
 
@@ -5003,7 +5137,11 @@ function renderMonthBars() {
     return;
   }
   $('#no-chart-data').style.display = 'none';
-  renderBarList($('#categoryBars'), sorted.map(([c, v]) => ({ label: `${CATEGORY_ICONS[c] || '🏷️'} ${c}`, value: v })));
+  renderBarList($('#categoryBars'), sorted.map(([c, v]) => ({
+    label: `${CATEGORY_ICONS[c] || '🏷️'} ${c}`,
+    value: v,
+    category: c
+  })));
 }
 
 function buildRecordItemHtml(r) {
@@ -5485,7 +5623,11 @@ function renderYearly() {
   } else {
     $('#no-year-cat-data').style.display = 'none';
     const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-    renderBarList($('#yearlyCategoryBars'), sorted.map(([c, v]) => ({ label: `${CATEGORY_ICONS[c] || '🏷️'} ${c}`, value: v })));
+    renderBarList($('#yearlyCategoryBars'), sorted.map(([c, v]) => ({
+      label: `${CATEGORY_ICONS[c] || '🏷️'} ${c}`,
+      value: v,
+      category: c
+    })));
   }
 
   renderYearCustomCatSum(byCat);
@@ -6228,6 +6370,251 @@ function applyRecordEffect(rec) {
 /**
  * actions.js — 新增/編輯紀錄、戶口、轉帳、日息、資產、強積金
  */
+
+/** 快速篩選 chip 列 */
+function renderFilterChips() {
+  const box = $('#filter-chips');
+  if (!box) return;
+  const typeChips = [
+    { key: 'type', value: '', label: '全部' },
+    { key: 'type', value: 'expense', label: '支出', cls: 'chip-expense' },
+    { key: 'type', value: 'income', label: '收入', cls: 'chip-income' }
+  ];
+  // 本月前幾名分類當快捷
+  const byCat = {};
+  getMonthRecords().forEach(r => {
+    if (r.type !== 'expense' && !isAdvance(r)) return;
+    if (isRepayment(r) || isTransfer(r) || isSavings(r) || isInterest(r) || isAdjustment(r) || isCollectReceivable(r)) return;
+    const c = r.category || '其他';
+    const amt = isAdvance(r) ? (Number(r.selfAmount) || 0) : (Number(r.amount) || 0);
+    if (amt <= 0) return;
+    byCat[c] = (byCat[c] || 0) + toMOP(amt, r.currency);
+  });
+  const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c);
+
+  let html = typeChips.map(c => {
+    const active = (filters.type || '') === c.value && !filters.category && !filters.account && !filters.currency
+      ? ' active' : ((filters.type || '') === c.value && c.value !== '' ? ' active' : '');
+    // type chip active when filters.type matches (category can also be set)
+    const isActive = (filters.type || '') === c.value && c.value !== ''
+      ? true
+      : (c.value === '' && !filters.type && !filters.category && !filters.account && !filters.currency);
+    return `<button type="button" class="filter-chip ${c.cls || ''}${isActive ? ' active' : ''}" data-chip-type="${c.value}">${c.label}</button>`;
+  }).join('');
+
+  topCats.forEach(c => {
+    const active = filters.category === c ? ' active' : '';
+    const icon = (typeof CATEGORY_ICONS !== 'undefined' && CATEGORY_ICONS[c]) ? CATEGORY_ICONS[c] + ' ' : '';
+    html += `<button type="button" class="filter-chip${active}" data-chip-cat="${escapeHtml(c)}">${icon}${escapeHtml(c)}</button>`;
+  });
+
+  // 顯示目前進階篩選（戶口／貨幣）
+  if (filters.account) {
+    const acc = accounts.find(a => a.id === filters.account);
+    html += `<button type="button" class="filter-chip active" data-chip-clear-account="1">${escapeHtml(acc?.name || '戶口')}<span class="chip-x">✕</span></button>`;
+  }
+  if (filters.currency) {
+    html += `<button type="button" class="filter-chip active" data-chip-clear-currency="1">${escapeHtml(filters.currency)}<span class="chip-x">✕</span></button>`;
+  }
+  if (filters.type || filters.category || filters.account || filters.currency) {
+    html += `<button type="button" class="filter-chip chip-clear" data-chip-reset="1">清除</button>`;
+  }
+
+  box.innerHTML = html;
+  box.querySelectorAll('[data-chip-type]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters.type = btn.dataset.chipType || '';
+      // 點「全部」清掉其他
+      if (!filters.type) {
+        filters.category = '';
+        filters.account = '';
+        filters.currency = '';
+      }
+      syncFilterPanelFromState();
+      renderMonthRecords();
+      renderFilterChips();
+    });
+  });
+  box.querySelectorAll('[data-chip-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.chipCat;
+      if (filters.category === cat) filters.category = '';
+      else filters.category = cat;
+      syncFilterPanelFromState();
+      renderMonthRecords();
+      renderFilterChips();
+    });
+  });
+  box.querySelectorAll('[data-chip-clear-account]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters.account = '';
+      syncFilterPanelFromState();
+      renderMonthRecords();
+      renderFilterChips();
+    });
+  });
+  box.querySelectorAll('[data-chip-clear-currency]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters.currency = '';
+      syncFilterPanelFromState();
+      renderMonthRecords();
+      renderFilterChips();
+    });
+  });
+  box.querySelectorAll('[data-chip-reset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters = { type: '', category: '', account: '', currency: '' };
+      syncFilterPanelFromState();
+      renderMonthRecords();
+      renderFilterChips();
+    });
+  });
+}
+
+function syncFilterPanelFromState() {
+  const ft = $('#filter-type'); if (ft) ft.value = filters.type || '';
+  const fc = $('#filter-category'); if (fc) fc.value = filters.category || '';
+  const fa = $('#filter-account'); if (fa) fa.value = filters.account || '';
+  const fcur = $('#filter-currency'); if (fcur) fcur.value = filters.currency || '';
+}
+
+/** 一鍵複製上筆：帶入最近一筆一般收支到新增表單（日期改今天） */
+function copyLastRecord() {
+  const candidates = records
+    .filter(r => r && !isTransfer(r) && !isCollectReceivable(r) && !isInterest(r) && !isAdjustment(r))
+    .slice()
+    .sort((a, b) => {
+      const ta = String(a.createdAt || a.date || '');
+      const tb = String(b.createdAt || b.date || '');
+      return tb.localeCompare(ta) || String(b.id).localeCompare(String(a.id));
+    });
+  if (!candidates.length) {
+    toast('尚無可複製的紀錄', 'err');
+    return;
+  }
+  const r = candidates[0];
+  if (!accounts.length) {
+    toast('請先到資產頁新增戶口', 'err');
+    switchPage('assets');
+    return;
+  }
+  openAddModal();
+  // 套用上筆欄位，日期改為今天
+  currentType = r.type === 'income' ? 'income' : 'expense';
+  $$('#record-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
+  $('#amount').value = r.amount;
+  $('#currency').value = r.currency || 'MOP';
+  $('#date').valueAsDate = new Date();
+  $('#note').value = r.note || '';
+  if ($('#record-tags')) $('#record-tags').value = typeof tagsToInputValue === 'function' ? tagsToInputValue(getRecordTags(r)) : '';
+  populateCategorySelect(r.category);
+  const preset = getSelectableCategories().map(c => c.name);
+  if (preset.includes(r.category) && r.category !== '其他') {
+    $('#category').value = r.category;
+    $('#custom-category-row')?.classList.add('hidden');
+  } else if (r.category) {
+    $('#category').value = '其他';
+    $('#custom-category-row')?.classList.remove('hidden');
+    if ($('#custom-category')) $('#custom-category').value = r.category;
+  }
+  onCategoryChange?.();
+  populateAccountSelect(r.viaWalletId || r.displayAccountId || r.accountId || '');
+  if (isAdvance(r)) {
+    if ($('#is-advance')) $('#is-advance').checked = true;
+    if ($('#advance-fields')) $('#advance-fields').classList.remove('hidden');
+    if ($('#advance-self-amt')) $('#advance-self-amt').value = r.selfAmount != null ? r.selfAmount : 0;
+    if ($('#advance-recv-amt')) $('#advance-recv-amt').value = r.recvAmount != null ? r.recvAmount : 0;
+  }
+  if ($('#advance-toggle-row')) $('#advance-toggle-row').classList.toggle('hidden', currentType === 'income');
+  toast('已帶入上筆（日期為今天）', 'ok');
+  setTimeout(() => { const a = $('#amount'); if (a) { a.focus(); a.select?.(); } }, 120);
+}
+
+/** 長按「＋」快捷選單 */
+function openQuickAddMenu() {
+  $('#quick-add-overlay')?.classList.remove('hidden');
+}
+function closeQuickAddMenu() {
+  $('#quick-add-overlay')?.classList.add('hidden');
+}
+function handleQuickAddAction(kind) {
+  closeQuickAddMenu();
+  if (kind === 'expense') {
+    openAddModal();
+    currentType = 'expense';
+    $$('#record-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
+    if ($('#advance-toggle-row')) $('#advance-toggle-row').classList.remove('hidden');
+  } else if (kind === 'income') {
+    openAddModal();
+    currentType = 'income';
+    $$('#record-form .type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'income'));
+    if ($('#advance-toggle-row')) $('#advance-toggle-row').classList.add('hidden');
+    if ($('#is-advance')) $('#is-advance').checked = false;
+    if ($('#advance-fields')) $('#advance-fields').classList.add('hidden');
+  } else if (kind === 'transfer') {
+    openTransferModal();
+  } else if (kind === 'savings') {
+    openSavingsModal();
+  }
+}
+
+function bindLongPressQuickAdd(el, onLong, onTap) {
+  if (!el || el.dataset.lpBound === '1') return;
+  el.dataset.lpBound = '1';
+  let timer = null;
+  let longFired = false;
+  let suppressClick = false;
+  const LP_MS = 420;
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const start = (e) => {
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    longFired = false;
+    suppressClick = false;
+    clear();
+    timer = setTimeout(() => {
+      longFired = true;
+      suppressClick = true;
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+      onLong();
+    }, LP_MS);
+  };
+  const end = (e) => {
+    const wasTimer = !!timer;
+    clear();
+    if (longFired || suppressClick) {
+      // 長按已處理，阻擋後續 click
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    // 短按：touch 用 touchend；滑鼠交給 click
+    if (e.type === 'touchend' && wasTimer) {
+      e.preventDefault();
+      onTap();
+    }
+  };
+  const cancel = () => { clear(); };
+  el.addEventListener('touchstart', start, { passive: true });
+  el.addEventListener('touchend', end, { passive: false });
+  el.addEventListener('touchmove', cancel, { passive: true });
+  el.addEventListener('touchcancel', cancel);
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', end);
+  el.addEventListener('mouseleave', cancel);
+  el.addEventListener('click', (e) => {
+    if (suppressClick || longFired) {
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClick = false;
+      longFired = false;
+      return;
+    }
+    // 桌面短按
+    if (e.pointerType === 'touch') return;
+    onTap();
+  });
+}
+
 function openAddModal() {
   if (!accounts.length) {
     toast('請先到資產頁新增戶口', 'err');
@@ -8153,13 +8540,15 @@ function init() {
   initFirebase();
   updateAuthButton();
 
-  $$('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
+  $$('.nav-btn').forEach(btn => {
     if (btn.id === 'nav-btn-add' || btn.classList.contains('nav-add')) {
-      openAddModal();
+      bindLongPressQuickAdd(btn, openQuickAddMenu, openAddModal);
       return;
     }
-    if (btn.dataset.page) switchPage(btn.dataset.page);
-  }));
+    btn.addEventListener('click', () => {
+      if (btn.dataset.page) switchPage(btn.dataset.page);
+    });
+  });
   // 存錢目標
   $('#btn-add-savings-goal')?.addEventListener('click', () => openSavingsGoalModal());
   $('#btn-close-savings-goal')?.addEventListener('click', closeSavingsGoalModal);
@@ -8168,7 +8557,18 @@ function init() {
   $('#savings-goal-modal-overlay')?.addEventListener('click', e => {
     if (e.target.id === 'savings-goal-modal-overlay') closeSavingsGoalModal();
   });
-  $('#btn-add').addEventListener('click', openAddModal);
+  const btnAdd = $('#btn-add');
+  if (btnAdd) bindLongPressQuickAdd(btnAdd, openQuickAddMenu, openAddModal);
+  $('#btn-copy-last')?.addEventListener('click', copyLastRecord);
+
+  // 快捷選單
+  $('#btn-quick-add-cancel')?.addEventListener('click', closeQuickAddMenu);
+  $('#quick-add-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'quick-add-overlay') closeQuickAddMenu();
+  });
+  $$('#quick-add-overlay .quick-add-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleQuickAddAction(btn.dataset.qa));
+  });
   $('#btn-close-modal').addEventListener('click', closeModal);
   $('#btn-cancel').addEventListener('click', closeModal);
   $('#btn-prev-month').addEventListener('click', () => changeMonth(-1));
@@ -8306,6 +8706,7 @@ function init() {
     filters.account = $('#filter-account').value;
     filters.currency = $('#filter-currency')?.value || '';
     renderMonthRecords();
+    renderFilterChips();
   });
   $('#btn-filter-reset').addEventListener('click', () => {
     filters = { type: '', category: '', account: '', currency: '' };
@@ -8314,6 +8715,7 @@ function init() {
     $('#filter-account').value = '';
     if ($('#filter-currency')) $('#filter-currency').value = '';
     renderMonthRecords();
+    renderFilterChips();
   });
 
   $('#btn-prev-year').addEventListener('click', () => { currentYear--; renderYearly(); });
