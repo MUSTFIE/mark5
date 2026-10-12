@@ -1313,6 +1313,56 @@ form { padding: 14px 18px 20px; }
 }
 .piggy-wrap.done .piggy-svg { animation: pig-bounce 0.8s ease infinite; }
 
+
+/* ===== Pin / sort accounts ===== */
+.account-grid-card.pinned {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: linear-gradient(160deg, rgba(79, 70, 229, 0.08), transparent);
+  position: relative;
+}
+.account-grid-card .pin-badge {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 0.72rem; line-height: 1; opacity: 0.9;
+}
+.account-grid-card[draggable="true"] { cursor: grab; }
+.account-grid-card.dragging { opacity: 0.55; transform: scale(0.98); }
+.account-grid-card.drag-over {
+  outline: 2px dashed rgba(79, 70, 229, 0.55);
+  outline-offset: 2px;
+}
+#btn-account-detail-pin.pinned {
+  border-color: rgba(79, 70, 229, 0.4);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+}
+.settings-info-block {
+  margin: 8px 16px 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--system-gray6);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.settings-info-block strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.settings-info-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 2px 0;
+}
+[data-theme="dark"] .account-grid-card.pinned {
+  background: linear-gradient(160deg, rgba(99, 102, 241, 0.16), transparent);
+}
+
+.account-detail-actions { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 400px) {
+  .account-detail-actions { grid-template-columns: 1fr 1fr; }
+  #btn-account-detail-pin { grid-column: 1 / -1; }
+}
 /* ===== 深色模式 ===== */
 [data-theme="dark"] {
   --bg: #0B1220;
@@ -1775,6 +1825,11 @@ form { padding: 14px 18px 20px; }
  <h3>設定</h3>
  <button type="button" id="btn-close-settings-monthly" class="btn-icon">×</button>
  </div>
+ <div class="settings-info-block" id="settings-storage-info">
+ <div class="settings-info-row"><span>本機資料量</span><strong id="settings-storage-size">計算中…</strong></div>
+ <div class="settings-info-row"><span>紀錄 / 戶口</span><strong id="settings-storage-counts">—</strong></div>
+ <div class="settings-info-row"><span>最後同步</span><strong id="settings-last-sync">尚未同步</strong></div>
+ </div>
  <div class="settings-menu">
  <button type="button" id="btn-settings-export" class="settings-menu-item">⬇　匯出 / 備份</button>
  <button type="button" id="btn-settings-rates" class="settings-menu-item">💱　匯率設定</button>
@@ -2073,6 +2128,7 @@ form { padding: 14px 18px 20px; }
  <div class="account-detail-body">
  <div id="account-detail-summary" class="account-detail-summary"></div>
  <div class="account-detail-actions">
+ <button type="button" id="btn-account-detail-pin" class="btn">📌 釘選</button>
  <button type="button" id="btn-account-detail-edit" class="btn">✎ 編輯</button>
  <button type="button" id="btn-account-detail-delete" class="btn danger-outline">刪除</button>
  </div>
@@ -3411,7 +3467,105 @@ function setSyncStatus(state, detail = '') {
   el.textContent = m.t;
   el.className = 'sync-status ' + m.cls;
   el.title = detail || m.t;
+  if (state === 'ok') {
+    try { setPref('lastSyncAt', Date.now()); } catch (_) {}
+    if (typeof updateSettingsStorageInfo === 'function') updateSettingsStorageInfo();
+  }
 }
+
+/** 估算本機 localStorage 使用量（本 App 相關 key） */
+function estimateAppStorageBytes() {
+  let total = 0;
+  try {
+    const prefixes = ['accounting_', 'firebase:'];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (!prefixes.some(p => k.startsWith(p)) && k !== PREFS_KEY) continue;
+      const v = localStorage.getItem(k) || '';
+      total += (k.length + v.length) * 2; // UTF-16
+    }
+  } catch (_) {}
+  return total;
+}
+
+function formatBytes(n) {
+  if (!n || n < 1024) return (n || 0) + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function formatLastSyncTime(ts) {
+  if (!ts) return '尚未同步';
+  const d = new Date(Number(ts));
+  if (Number.isNaN(d.getTime())) return '尚未同步';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function updateSettingsStorageInfo() {
+  const sizeEl = document.getElementById('settings-storage-size');
+  const countsEl = document.getElementById('settings-storage-counts');
+  const syncEl = document.getElementById('settings-last-sync');
+  if (sizeEl) sizeEl.textContent = formatBytes(estimateAppStorageBytes());
+  if (countsEl) {
+    const nRec = (typeof records !== 'undefined' && Array.isArray(records)) ? records.length : 0;
+    const nAcc = (typeof accounts !== 'undefined' && Array.isArray(accounts)) ? accounts.length : 0;
+    countsEl.textContent = `${nRec} 筆 / ${nAcc} 個`;
+  }
+  if (syncEl) syncEl.textContent = formatLastSyncTime(getPref('lastSyncAt', 0));
+}
+
+/** 釘選戶口偏好 */
+function getPinnedAccountIds() {
+  const v = getPref('pinnedAccountIds', []);
+  return Array.isArray(v) ? v.filter(Boolean) : [];
+}
+function setPinnedAccountIds(ids) {
+  setPref('pinnedAccountIds', Array.isArray(ids) ? ids : []);
+}
+function isAccountPinned(id) {
+  return getPinnedAccountIds().includes(id);
+}
+function toggleAccountPin(id) {
+  if (!id) return false;
+  const list = getPinnedAccountIds();
+  const i = list.indexOf(id);
+  if (i >= 0) list.splice(i, 1);
+  else list.unshift(id);
+  setPinnedAccountIds(list);
+  return list.includes(id);
+}
+/** 自訂排序：pinned 優先，再依 accountOrder，最後類型／名稱 */
+function getAccountOrderMap() {
+  const order = getPref('accountOrder', []);
+  const map = new Map();
+  if (Array.isArray(order)) order.forEach((id, i) => map.set(id, i));
+  return map;
+}
+function setAccountOrder(ids) {
+  setPref('accountOrder', Array.isArray(ids) ? ids : []);
+}
+function sortAccountsForDisplay(list) {
+  const pinned = new Set(getPinnedAccountIds());
+  const orderMap = getAccountOrderMap();
+  const typeRank = (t) => {
+    const i = (typeof TYPE_ORDER !== 'undefined' ? TYPE_ORDER : []).indexOf(t);
+    return i >= 0 ? i : 999;
+  };
+  return list.slice().sort((a, b) => {
+    const pa = pinned.has(a.id) ? 0 : 1;
+    const pb = pinned.has(b.id) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const oa = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+    const ob = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+    if (oa !== ob) return oa - ob;
+    return typeRank(a.type) - typeRank(b.type) || String(a.name).localeCompare(String(b.name), 'zh');
+  });
+}
+
+let _pendingExpandDate = null; // YYYY-MM-DD after add record
+
 
 function updateOfflineBanner() {
   const banner = document.getElementById('offline-banner');
@@ -5099,7 +5253,10 @@ function renderMonthRecords() {
       else if (r.type === 'expense' && !isRepayment(r)) dayExpense += amt;
     });
     const group = document.createElement('div');
-    group.className = 'day-group' + (idx < 3 ? ' expanded' : '') + ' day-alt-' + (idx % 2);
+    const forceExpand = _pendingExpandDate && date === _pendingExpandDate;
+    const shouldExpand = forceExpand || (!_pendingExpandDate && idx < 3);
+    group.className = 'day-group' + (shouldExpand ? ' expanded' : '') + ' day-alt-' + (idx % 2);
+    group.dataset.date = date;
     const weekday = weekdayNames[new Date(date + 'T00:00:00').getDay()];
     group.innerHTML = `
       <button type="button" class="day-group-header">
@@ -5123,6 +5280,14 @@ function renderMonthRecords() {
   el.appendChild(frag);
   // 委派已在 init 綁定，這裡僅確保
   bindRecordActions(el);
+  if (_pendingExpandDate) {
+    const target = el.querySelector(`.day-group[data-date="${_pendingExpandDate}"]`);
+    if (target) {
+      target.classList.add('expanded');
+      try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+    }
+    _pendingExpandDate = null;
+  }
 }
 
 function getYearRecords() {
@@ -5506,16 +5671,11 @@ function renderAccounts() {
   if (netCnyEl) netCnyEl.textContent = formatMoney(nets.CNY);
   if (netTotalEl) netTotalEl.textContent = money('MOP', toMOP(nets.MOP, 'MOP') + toMOP(nets.HKD, 'HKD') + toMOP(nets.CNY, 'CNY'));
 
-  // 主戶口：雙欄網格卡片（僅名稱 + 餘額，不顯示類型）
+  // 主戶口：雙欄網格卡片（釘選優先 + 可拖曳排序）
   const MAIN_EXCLUDE = new Set(['電子錢包', '現金', '應收帳款']);
-  const typeRank = (t) => {
-    const i = TYPE_ORDER.indexOf(t);
-    return i >= 0 ? i : 999;
-  };
-  const mainAccounts = accounts
-    .filter(a => !MAIN_EXCLUDE.has(a.type))
-    .slice()
-    .sort((a, b) => typeRank(a.type) - typeRank(b.type) || String(a.name).localeCompare(String(b.name), 'zh'));
+  const mainAccounts = sortAccountsForDisplay(
+    accounts.filter(a => !MAIN_EXCLUDE.has(a.type))
+  );
   const container = $('#accounts-by-type');
   if (container) {
     container.innerHTML = '';
@@ -5529,13 +5689,16 @@ function renderAccounts() {
       if (noAcc) noAcc.style.display = 'none';
       mainAccounts.forEach(a => {
         const prim = accountPrimaryBalance(a);
+        const pinned = isAccountPinned(a.id);
         const item = document.createElement('div');
-        item.className = 'account-grid-card';
+        item.className = 'account-grid-card' + (pinned ? ' pinned' : '');
         item.dataset.id = a.id;
         item.setAttribute('role', 'button');
         item.tabIndex = 0;
+        item.draggable = true;
         const negCls = prim.amount < 0 ? ' neg' : '';
         item.innerHTML = `
+          ${pinned ? '<span class="pin-badge" title="已釘選">📌</span>' : ''}
           <div class="account-grid-name">${escapeHtml(a.name)}</div>
           <div class="account-grid-bal${negCls}">${money(prim.currency, prim.amount)}</div>`;
         container.appendChild(item);
@@ -5547,15 +5710,17 @@ function renderAccounts() {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
       });
+      bindAccountCardDrag(container);
     }
   }
 
   // 其他：電子錢包、現金、應收帳款（雙欄網格）
   const OTHER_TYPES = ['電子錢包', '現金', '應收帳款'];
-  const otherAccounts = [];
+  let otherAccounts = [];
   OTHER_TYPES.forEach(type => {
     accounts.filter(a => a.type === type).forEach(a => otherAccounts.push(a));
   });
+  otherAccounts = sortAccountsForDisplay(otherAccounts);
   const otherEl = $('#accounts-other-list');
   const noOther = $('#no-other-accounts');
   if (otherEl) {
@@ -5568,13 +5733,16 @@ function renderAccounts() {
       otherAccounts.forEach(a => {
         const isWallet = a.type === '電子錢包';
         const prim = accountPrimaryBalance(a);
+        const pinned = isAccountPinned(a.id);
         const item = document.createElement('div');
-        item.className = 'account-grid-card';
+        item.className = 'account-grid-card' + (pinned ? ' pinned' : '');
         item.dataset.id = a.id;
         item.setAttribute('role', 'button');
         item.tabIndex = 0;
+        item.draggable = true;
         const negCls = !isWallet && prim.amount < 0 ? ' neg' : '';
         item.innerHTML = `
+          ${pinned ? '<span class="pin-badge" title="已釘選">📌</span>' : ''}
           <div class="account-grid-name">${escapeHtml(a.name)}</div>
           <div class="account-grid-bal${negCls}">${isWallet ? '—' : money(prim.currency, prim.amount)}</div>`;
         otherEl.appendChild(item);
@@ -5586,8 +5754,75 @@ function renderAccounts() {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
       });
+      bindAccountCardDrag(otherEl);
     }
   }
+}
+
+/** 戶口卡片拖曳排序（同容器內） */
+function bindAccountCardDrag(container) {
+  if (!container || container.dataset.dragBound === '1') {
+    // 重新 render 後需重綁，清掉舊 flag 時可直接綁
+  }
+  container.dataset.dragBound = '1';
+  let dragId = null;
+  let suppressClick = false;
+  container.querySelectorAll('.account-grid-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      dragId = card.dataset.id;
+      card.classList.add('dragging');
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragId);
+      } catch (_) {}
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      container.querySelectorAll('.account-grid-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+      dragId = null;
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+      const over = e.currentTarget;
+      if (over.dataset.id !== dragId) over.classList.add('drag-over');
+    });
+    card.addEventListener('dragleave', e => {
+      e.currentTarget.classList.remove('drag-over');
+    });
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const target = e.currentTarget;
+      target.classList.remove('drag-over');
+      const fromId = dragId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+      const toId = target.dataset.id;
+      if (!fromId || !toId || fromId === toId) return;
+      // 以目前 DOM 順序為基準重排
+      const ids = [...container.querySelectorAll('.account-grid-card')].map(c => c.dataset.id);
+      const fromIdx = ids.indexOf(fromId);
+      const toIdx = ids.indexOf(toId);
+      if (fromIdx < 0 || toIdx < 0) return;
+      ids.splice(fromIdx, 1);
+      ids.splice(toIdx, 0, fromId);
+      // 合併進全域 accountOrder（保留其他不在此列表的 id）
+      const prev = getPref('accountOrder', []);
+      const inSet = new Set(ids);
+      const merged = ids.concat((Array.isArray(prev) ? prev : []).filter(id => !inSet.has(id)));
+      setAccountOrder(merged);
+      suppressClick = true;
+      if (typeof renderAccounts === 'function') renderAccounts();
+      else if (typeof renderAssets === 'function') renderAssets();
+    });
+    // 防止拖曳後觸發 click 開詳情
+    card.addEventListener('click', e => {
+      if (suppressClick) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        suppressClick = false;
+      }
+    }, true);
+  });
 }
 
 function openAccountDetailModal(accountId) {
@@ -5614,6 +5849,20 @@ function openAccountDetailModal(accountId) {
   }
   $('#account-detail-summary').innerHTML = summary;
 
+  const pinBtn = $('#btn-account-detail-pin');
+  if (pinBtn) {
+    const pinned = isAccountPinned(a.id);
+    pinBtn.textContent = pinned ? '📌 取消釘選' : '📌 釘選';
+    pinBtn.classList.toggle('pinned', pinned);
+    pinBtn.onclick = () => {
+      const nowPinned = toggleAccountPin(a.id);
+      pinBtn.textContent = nowPinned ? '📌 取消釘選' : '📌 釘選';
+      pinBtn.classList.toggle('pinned', nowPinned);
+      toast(nowPinned ? '已釘選戶口' : '已取消釘選', 'ok');
+      if (currentPage === 'assets') renderAssets();
+      else renderAccounts();
+    };
+  }
   const editBtn = $('#btn-account-detail-edit');
   const delBtn = $('#btn-account-detail-delete');
   editBtn.onclick = () => {
@@ -6138,9 +6387,17 @@ function handleRecordSubmit(e) {
     queueAccountsUpsertByIds(accountIdsTouchedByRecord(rec).concat(oldAdv ? accountIdsTouchedByRecord(oldAdv) : []));
     setPref('lastAccountId', selectedId);
     setPref('lastCurrency', currency);
+    const expandDate = String(rec.date || '').slice(0, 10) || null;
     closeModal();
     toast(oldAdv ? '已更新代墊' : '已新增代墊', 'ok');
-    switchPage(currentPage);
+    _pendingExpandDate = expandDate;
+    // 對齊月份並回到本月紀錄
+    if (expandDate && expandDate.length >= 7) {
+      const [yy, mm] = expandDate.split('-').map(Number);
+      if (yy) currentYear = yy;
+      if (mm) currentMonth = mm - 1;
+    }
+    switchPage('monthly');
     return;
   }
 
@@ -6217,12 +6474,16 @@ function handleRecordSubmit(e) {
   queueAccountsUpsertByIds(accountIdsTouchedByRecord(record).concat(old ? accountIdsTouchedByRecord(old) : []));
   if (record.accountId) setPref('lastAccountId', record.viaWalletId || record.displayAccountId || record.accountId);
   if (record.currency) setPref('lastCurrency', record.currency);
+  const expandDate = String(record.date || '').slice(0, 10) || null;
   closeModal();
   toast(old ? '已更新紀錄' : '已新增紀錄', 'ok');
-  if (currentPage === 'monthly') renderMonthly();
-  else if (currentPage === 'analysis') renderAnalysis();
-  else if (currentPage === 'assets') renderAssets();
-  else if (currentPage === 'budget') renderBudgetPage();
+  _pendingExpandDate = expandDate;
+  if (expandDate && expandDate.length >= 7) {
+    const [yy, mm] = expandDate.split('-').map(Number);
+    if (yy) currentYear = yy;
+    if (mm) currentMonth = mm - 1;
+  }
+  switchPage('monthly');
 }
 
 function deleteRecord(id) {
@@ -7653,11 +7914,49 @@ function csvEscape(v) {
   return s;
 }
 
+function recordTypeLabelForExport(r) {
+  if (!r) return '';
+  if (isAdvance(r)) return '代墊';
+  if (isTransfer(r) && isCollectReceivable(r)) return '收回應收';
+  if (isTransfer(r)) return '轉帳';
+  if (isCollectReceivable(r)) return '收回應收';
+  if (isInterest(r)) return '利息';
+  if (isSavings(r)) return '存錢';
+  if (isAdjustment(r)) return '戶口調整';
+  if (isRepayment(r)) return '信用卡還款';
+  if (r.type === 'income') return '收入';
+  if (r.type === 'expense') return '支出';
+  return r.type || '';
+}
+
 function exportRecordsCSV() {
-  const headers = ['日期','類型','分類','金額','貨幣','戶口','備註'];
+  const headers = ['日期','類型','分類','金額','貨幣','戶口','備註','特殊標記'];
   const rows = records.map(r => {
     const acc = accounts.find(a => a.id === (r.displayAccountId || r.accountId));
-    return [r.date, r.type === 'income' ? '收入' : '支出', r.category, r.amount, r.currency, acc?.name || '', r.note || ''];
+    const typeLabel = recordTypeLabelForExport(r);
+    const flags = [];
+    if (isAdvance(r)) {
+      flags.push('代墊');
+      if (r.selfAmount != null) flags.push('自費:' + r.selfAmount);
+      if (r.recvAmount != null) flags.push('應收:' + r.recvAmount);
+    }
+    if (isTransfer(r) && !isCollectReceivable(r)) flags.push('內部轉帳');
+    if (isCollectReceivable(r)) flags.push('收回應收');
+    if (isInterest(r)) flags.push('利息(不計收入)');
+    if (isSavings(r)) flags.push('存錢(不計消費)');
+    if (isAdjustment(r)) flags.push('戶口調整');
+    if (isRepayment(r)) flags.push('信用卡還款');
+    if (r.tags && r.tags.length) flags.push('標籤:' + r.tags.join('/'));
+    return [
+      r.date,
+      typeLabel,
+      r.category,
+      r.amount,
+      r.currency,
+      acc?.name || '',
+      r.note || '',
+      flags.join('；')
+    ];
   });
   const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
   downloadFile(`記帳紀錄_${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
@@ -7693,8 +7992,12 @@ function exportMpfCSV() {
 async function clearAllData() {
   const ok1 = confirm('確定要清空所有資料？\n\n包含：記帳紀錄、戶口、強積金、扣減項、匯率設定。\n此操作無法復原，建議先導出備份。');
   if (!ok1) return;
-  const ok2 = confirm('再次確認：真的要永久刪除全部資料嗎？');
-  if (!ok2) return;
+  const typed = prompt('此操作無法復原。\n請輸入「確認」兩字以繼續清空全部資料：');
+  if (typed == null) return;
+  if (String(typed).trim() !== '確認') {
+    alert('未輸入正確的確認文字，已取消清空。');
+    return;
+  }
 
   records = [];
   accounts = [];
@@ -7911,7 +8214,10 @@ function init() {
 
 
   // 記帳頁設定
-  const openMonthlySettings = () => $('#settings-monthly-overlay').classList.remove('hidden');
+  const openMonthlySettings = () => {
+    updateSettingsStorageInfo();
+    $('#settings-monthly-overlay').classList.remove('hidden');
+  };
   const closeMonthlySettings = () => $('#settings-monthly-overlay').classList.add('hidden');
   $('#btn-settings-monthly')?.addEventListener('click', openMonthlySettings);
   $('#btn-close-settings-monthly')?.addEventListener('click', closeMonthlySettings);
