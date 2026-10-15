@@ -2141,16 +2141,12 @@ form { padding: 14px 18px 20px; }
  <div class="table-wrap">
  <table class="assets-history-table" id="assets-history-table">
  <thead>
- <tr><th>月份</th><th>總存款</th><th>總資產</th><th>淨資產</th><th>較上月</th></tr>
+ <tr><th>月份</th><th>總存款</th><th>較上月</th><th>淨資產</th><th>較上月</th></tr>
  </thead>
  <tbody id="assets-history-body"></tbody>
  </table>
  </div>
  <div id="no-assets-history" class="empty-hint" style="display:none">尚無可比較的月份資料</div>
- </section>
- <section class="chart-section">
- <h3>淨資產趨勢</h3>
- <div id="assets-history-bars" class="bar-list"></div>
  </section>
  </div>
  </div>
@@ -8762,7 +8758,6 @@ function renderAssetsHistory() {
   if (label) label.textContent = `${assetsHistoryYear}年`;
   const body = $('#assets-history-body');
   const noEl = $('#no-assets-history');
-  const barsEl = $('#assets-history-bars');
   if (!body) return;
 
   let rows = [];
@@ -8785,7 +8780,6 @@ function renderAssetsHistory() {
   if (!rows.length) {
     body.innerHTML = '';
     if (noEl) noEl.style.display = 'block';
-    if (barsEl) barsEl.innerHTML = '';
     return;
   }
   if (noEl) noEl.style.display = 'none';
@@ -8795,40 +8789,28 @@ function renderAssetsHistory() {
   if ($('#ah-latest-gross')) $('#ah-latest-gross').textContent = money('MOP', latest.gross);
   if ($('#ah-latest-net')) $('#ah-latest-net').textContent = money('MOP', latest.net);
 
+  function deltaCell(curr, prevVal) {
+    if (prevVal == null) return '—';
+    const d = curr - prevVal;
+    const cls = d > 0 ? 'delta-up' : d < 0 ? 'delta-down' : '';
+    const sign = d > 0 ? '+' : '';
+    return `<span class="${cls}">${sign}${formatMoney(d)}</span>`;
+  }
+
   let html = '';
-  rows.slice().reverse().forEach((r, i, arr) => {
-    // arr is reversed: index 0 = latest; prev month is next in original
+  rows.slice().reverse().forEach((r, i) => {
     const origIdx = rows.length - 1 - i;
     const prev = origIdx > 0 ? rows[origIdx - 1] : null;
-    const delta = prev ? (r.net - prev.net) : null;
-    let deltaHtml = '—';
-    if (delta != null) {
-      const cls = delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : '';
-      const sign = delta > 0 ? '+' : '';
-      deltaHtml = `<span class="${cls}">${sign}${formatMoney(delta)}</span>`;
-    }
     const isLatest = origIdx === rows.length - 1;
     html += `<tr>
-      <td>${assetsHistoryYear}年${r.month + 1}月${isLatest ? '（最新）' : ''}</td>
+      <td>${r.month + 1}月${isLatest ? '（最新）' : ''}</td>
       <td>${formatMoney(r.deposit)}</td>
-      <td>${formatMoney(r.gross)}</td>
+      <td>${deltaCell(r.deposit, prev ? prev.deposit : null)}</td>
       <td>${formatMoney(r.net)}</td>
-      <td>${deltaHtml}</td>
+      <td>${deltaCell(r.net, prev ? prev.net : null)}</td>
     </tr>`;
   });
   body.innerHTML = html;
-
-  if (barsEl) {
-    const maxAbs = Math.max(...rows.map(r => Math.abs(r.net)), 1);
-    barsEl.innerHTML = rows.map(r => {
-      const pct = Math.min(100, Math.round(Math.abs(r.net) / maxAbs * 100));
-      const color = r.net < 0 ? 'var(--expense)' : 'var(--grad-primary)';
-      return `<div class="bar-row">
-        <div class="bar-row-top"><span class="bar-label">${r.month + 1}月</span><span class="bar-val">${formatMoney(r.net)}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${r.net < 0 ? 'linear-gradient(90deg,#F43F5E,#FB7185)' : ''}"></div></div>
-      </div>`;
-    }).join('');
-  }
 }
 
 
