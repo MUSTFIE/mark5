@@ -1561,6 +1561,399 @@ form { padding: 14px 18px 20px; }
   border-bottom-color: rgba(148, 163, 184, 0.1);
 }
 [data-theme="dark"] .month-table tbody tr.month-table-total { background: #1E293B; }
+
+/* ===== UI / UX Polish ===== */
+:root {
+  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 2px 10px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+  --shadow-float: 0 12px 36px rgba(79, 70, 229, 0.32), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page.active { animation: pageIn .28s var(--ease-out); }
+
+/* Summary cards — accent bar + clearer hierarchy */
+.summary-cards .card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border-radius: 16px;
+}
+.summary-cards .card.expense::before,
+.summary-cards .card.income::before,
+.summary-cards .card.balance::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 12%; right: 12%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  opacity: 0.95;
+}
+.summary-cards .card.expense::before {
+  background: linear-gradient(90deg, #F43F5E, #FB7185);
+}
+.summary-cards .card.income::before {
+  background: linear-gradient(90deg, #10B981, #34D399);
+}
+.summary-cards .card.balance::before {
+  background: linear-gradient(90deg, #6366F1, #8B5CF6);
+}
+.summary-cards .card .label {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+.summary-cards .card .value {
+  font-size: 1.08rem;
+  font-weight: 780;
+  letter-spacing: -0.035em;
+}
+
+/* Month navigation as a soft pill bar */
+.month-nav {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px 6px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
+  gap: 8px;
+}
+.month-nav .btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--input-bg);
+  transition: background .15s ease, transform .12s ease;
+}
+.month-nav .btn-icon:active {
+  transform: scale(0.94);
+  background: var(--primary-soft);
+}
+.month-nav h2 {
+  font-size: 1.05rem;
+  font-weight: 720;
+}
+
+/* Bottom nav refinements */
+.bottom-nav {
+  background: rgba(255, 255, 255, 0.82);
+  border-top: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.07);
+}
+.nav-btn {
+  position: relative;
+  transition: color .18s ease, transform .12s ease;
+  gap: 3px;
+}
+.nav-btn .nav-icon {
+  font-size: 1.3rem;
+  transition: transform .18s var(--ease-out);
+}
+.nav-btn.active {
+  color: var(--primary);
+}
+.nav-btn.active .nav-icon {
+  transform: scale(1.1);
+}
+.nav-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+.nav-btn.nav-add .nav-add-circle {
+  box-shadow: var(--shadow-float);
+  transition: transform .15s var(--ease-out), box-shadow .2s ease;
+}
+.nav-btn.nav-add:active .nav-add-circle {
+  transform: scale(0.94);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
+}
+
+/* Primary buttons with softer depth */
+.btn.primary {
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.30);
+  letter-spacing: -0.01em;
+}
+.btn.primary:active {
+  box-shadow: 0 3px 10px rgba(79, 70, 229, 0.22);
+}
+
+/* Empty states — friendlier */
+.empty-hint {
+  padding: 28px 18px;
+  border-radius: 16px;
+  background: rgba(148, 163, 184, 0.07);
+  border: 1.5px dashed rgba(148, 163, 184, 0.35);
+  color: var(--muted);
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+/* Day groups — clearer expand state */
+.day-group {
+  transition: box-shadow .2s ease, border-color .2s ease, background .15s ease;
+  border-radius: 16px;
+}
+.day-group.expanded {
+  box-shadow: var(--shadow-card);
+  border-color: rgba(79, 70, 229, 0.16);
+}
+.day-group-header {
+  padding: 13px 14px;
+  border-radius: 16px;
+  transition: background .12s ease;
+}
+.day-group-header:active {
+  background: rgba(79, 70, 229, 0.05);
+}
+.day-chevron {
+  transition: transform .2s var(--ease-out);
+}
+
+/* Record items softer spacing */
+.day-group-body .record-item,
+.day-group-body .ledger-item {
+  border-radius: 12px;
+  transition: background .12s ease, transform .12s ease;
+}
+.record-item.compact:active {
+  transform: scale(0.99);
+}
+
+/* Assets hero — more premium */
+.assets-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 22px 18px 18px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.assets-hero::after {
+  content: '';
+  position: absolute;
+  right: -18%;
+  top: -50%;
+  width: 70%;
+  height: 160%;
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.14), transparent 68%);
+  pointer-events: none;
+}
+.assets-hero .value {
+  font-size: 1.65rem;
+  font-weight: 820;
+  letter-spacing: -0.03em;
+  position: relative;
+  z-index: 1;
+}
+.assets-hero .label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modal sheets — iOS-like handle + softer top */
+.modal.modal-sheet {
+  border-radius: 22px 22px 0 0;
+}
+.modal-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  margin: 10px auto 2px;
+  flex-shrink: 0;
+}
+.modal-header {
+  padding-top: 10px;
+}
+.modal {
+  box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.14);
+}
+
+/* Progress bars slightly taller + smoother */
+.budget-progress-bar,
+.savings-goal-progress,
+.goal-bar {
+  height: 10px;
+  border-radius: 999px;
+}
+.budget-progress-fill,
+.savings-goal-progress-fill,
+.goal-bar-fill {
+  transition: width .35s var(--ease-out);
+}
+
+/* Filter / template chips */
+.filter-chip,
+.tpl-chip,
+.cat-sum-chip,
+.budget-cat-chip,
+.tag-chip {
+  transition: transform .12s ease, background .15s ease, border-color .15s ease, color .15s ease;
+}
+.filter-chip:active,
+.tpl-chip:active,
+.cat-sum-chip:active {
+  transform: scale(0.96);
+}
+
+/* Toast more refined */
+.app-toast {
+  border-radius: 16px;
+  padding: 13px 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Sub-tabs clearer active state */
+.sub-tabs {
+  padding: 5px;
+  border-radius: 14px;
+}
+.sub-tab {
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.sub-tab.active {
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.09);
+}
+
+/* Section cards consistent radius */
+.chart-section,
+.records-section,
+.budget-section,
+.savings-goal-section,
+.savings-section {
+  border-radius: 18px;
+}
+
+/* Quick-add sheet polish */
+.quick-add-sheet {
+  border-radius: 22px 22px 0 0;
+  padding-top: 8px;
+}
+.quick-add-sheet::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 4px;
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  margin: 0 auto 12px;
+}
+.quick-add-btn {
+  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+  border-radius: 16px;
+  font-weight: 720;
+}
+.quick-add-btn:active {
+  transform: scale(0.96);
+}
+
+/* Account grid cards */
+.account-grid-card {
+  transition: transform .12s ease, box-shadow .15s ease, background .12s ease;
+  border-radius: 16px;
+}
+.account-grid-card:active {
+  transform: scale(0.97);
+}
+
+/* Dark mode adjustments for new polish */
+[data-theme="dark"] .month-nav {
+  background: var(--card);
+}
+[data-theme="dark"] .month-nav .btn-icon {
+  background: #1E293B;
+}
+[data-theme="dark"] .empty-hint {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+[data-theme="dark"] .day-group.expanded {
+  border-color: rgba(99, 102, 241, 0.28);
+}
+[data-theme="dark"] .bottom-nav {
+  background: rgba(15, 23, 42, 0.9) !important;
+}
+[data-theme="dark"] .nav-btn.active::after {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+[data-theme="dark"] .modal-sheet-handle,
+[data-theme="dark"] .quick-add-sheet::before {
+  background: rgba(148, 163, 184, 0.35);
+}
+[data-theme="dark"] .assets-hero::after {
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2), transparent 68%);
+}
+
+#accounts-bank-list.accounts-grid,
+#accounts-credit-list.accounts-grid,
+#accounts-invest-list.accounts-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+#accounts-bank-list.accounts-grid .account-grid-card,
+#accounts-credit-list.accounts-grid .account-grid-card,
+#accounts-invest-list.accounts-grid .account-grid-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 12px; box-shadow: var(--shadow); cursor: pointer; text-align: center;
+  min-height: 72px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px;
+  transition: background .12s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+#accounts-bank-list.accounts-grid .account-grid-card:active,
+#accounts-credit-list.accounts-grid .account-grid-card:active,
+#accounts-invest-list.accounts-grid .account-grid-card:active {
+  background: rgba(79, 70, 229, 0.06); transform: scale(0.98);
+}
+#accounts-bank-list .account-grid-name,
+#accounts-credit-list .account-grid-name,
+#accounts-invest-list .account-grid-name {
+  font-size: 0.85rem; font-weight: 650; color: var(--text); line-height: 1.25; word-break: break-all;
+}
+#accounts-bank-list .account-grid-bal,
+#accounts-credit-list .account-grid-bal,
+#accounts-invest-list .account-grid-bal {
+  font-size: 0.95rem; font-weight: 750; font-variant-numeric: tabular-nums;
+  color: var(--primary); letter-spacing: -0.02em;
+}
+#accounts-bank-list .account-grid-bal.neg,
+#accounts-credit-list .account-grid-bal.neg,
+#accounts-invest-list .account-grid-bal.neg { color: var(--expense); }
+#section-bank.expanded > .section-summary,
+#section-credit.expanded > .section-summary { display: none !important; }
+@media (max-width: 360px) {
+  #accounts-bank-list.accounts-grid,
+  #accounts-credit-list.accounts-grid,
+  #accounts-invest-list.accounts-grid { grid-template-columns: 1fr; }
+}
+.assets-history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.assets-history-table th, .assets-history-table td {
+  padding: 10px 8px; text-align: right; border-bottom: 1px solid #f3f4f6;
+}
+.assets-history-table th:first-child, .assets-history-table td:first-child { text-align: left; font-weight: 600; }
+.assets-history-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; }
+.assets-history-table .delta-up { color: var(--income); }
+.assets-history-table .delta-down { color: var(--expense); }
+.assets-history-table tbody tr:last-child td { font-weight: 700; background: var(--system-gray6); }
+[data-theme="dark"] .assets-history-table th,
+[data-theme="dark"] .assets-history-table td { border-bottom-color: rgba(148,163,184,0.1); }
+[data-theme="dark"] .assets-history-table tbody tr:last-child td { background: #1E293B; }
+
 </style>
 </head>
 <body>
@@ -1657,7 +2050,7 @@ form { padding: 14px 18px 20px; }
  </div>
  </div>
  <div id="records-list"></div>
- <div id="no-records" class="empty-hint">本月尚無紀錄</div>
+ <div id="no-records" class="empty-hint">📝 本月尚無紀錄<br><span style="font-size:0.8em;opacity:.85">點下方「＋」開始記第一筆</span></div>
  </section>
  </div>
  </div>
@@ -1666,6 +2059,7 @@ form { padding: 14px 18px 20px; }
  <div class="sub-tabs">
  <button type="button" class="sub-tab active" data-sub="month">月份</button>
  <button type="button" class="sub-tab" data-sub="year">年份</button>
+ <button type="button" class="sub-tab" data-sub="assets">資產</button>
  </div>
  <div id="analysis-month" class="analysis-panel active">
  <div class="month-nav">
@@ -1729,6 +2123,36 @@ form { padding: 14px 18px 20px; }
  <div id="no-year-tags" class="empty-hint" style="display:none">本年尚無標籤</div>
  </section>
  </div>
+
+ <div id="analysis-assets" class="analysis-panel">
+ <div class="month-nav">
+ <button type="button" id="btn-prev-year-assets" class="btn-icon">‹</button>
+ <h2 id="assets-history-year-label">2026年</h2>
+ <button type="button" id="btn-next-year-assets" class="btn-icon">›</button>
+ </div>
+ <p class="summary-hint" style="margin-bottom:12px">各月數字為該月最後一天的估計值（由目前餘額倒推當月之後的流水）。強積金取該月或之前最近一次結餘紀錄。</p>
+ <div class="summary-cards summary-stackable" style="margin-bottom:12px">
+ <div class="card balance"><div class="label">最新總存款</div><div class="value" id="ah-latest-deposit">MOP 0</div></div>
+ <div class="card income"><div class="label">最新總資產</div><div class="value" id="ah-latest-gross">MOP 0</div></div>
+ <div class="card balance summary-bottom"><div class="label">最新淨資產</div><div class="value" id="ah-latest-net">MOP 0</div></div>
+ </div>
+ <section class="records-section">
+ <h3>各月資產比較</h3>
+ <div class="table-wrap">
+ <table class="assets-history-table" id="assets-history-table">
+ <thead>
+ <tr><th>月份</th><th>總存款</th><th>總資產</th><th>淨資產</th><th>較上月</th></tr>
+ </thead>
+ <tbody id="assets-history-body"></tbody>
+ </table>
+ </div>
+ <div id="no-assets-history" class="empty-hint" style="display:none">尚無可比較的月份資料</div>
+ </section>
+ <section class="chart-section">
+ <h3>淨資產趨勢</h3>
+ <div id="assets-history-bars" class="bar-list"></div>
+ </section>
+ </div>
  </div>
 
  <div id="page-budget" class="page">
@@ -1787,7 +2211,7 @@ form { padding: 14px 18px 20px; }
  </div>
  <p class="savings-goal-hint" style="margin-bottom:8px">
  <div id="savings-goals-list" class="goal-list"></div>
- <div id="no-savings-goals" class="empty-hint">尚未設定存錢目標</div>
+ <div id="no-savings-goals" class="empty-hint">🐷 尚未設定存錢目標<br><span style="font-size:0.8em;opacity:.85">設定目標後，存錢會自動累計進度</span></div>
  <div class="summary-cards summary-analysis-month" style="margin-top:12px;margin-bottom:0">
  <div class="card balance">
  <div class="label">本月已存</div>
@@ -1864,22 +2288,55 @@ form { padding: 14px 18px 20px; }
   <!-- assets-liability kept for JS updates (hidden) -->
   <div id="assets-liability" class="hidden" aria-hidden="true">MOP 0</div>
  </div>
- <section class="records-section collapsible-section" id="section-accounts">
- <div class="section-collapse-header" data-section="accounts" role="button" tabindex="0">
- <span class="section-collapse-title"><span class="sec-chevron">▼</span> 戶口</span>
+ <section class="records-section collapsible-section" id="section-bank">
+ <div class="section-collapse-header" data-section="bank" role="button" tabindex="0">
+ <span class="section-collapse-title"><span class="sec-chevron">▼</span> 銀行戶口</span>
+ <span class="section-header-total" id="bank-section-total">MOP 0</span>
  </div>
  <div class="section-summary">
  <div class="summary-cards currency-three currency-three-compact">
- <div class="card balance"><div class="label">MOP</div><div class="value" id="net-mop">0</div></div>
- <div class="card balance"><div class="label">HKD</div><div class="value" id="net-hkd">0</div></div>
- <div class="card balance"><div class="label">CNY</div><div class="value" id="net-cny">0</div></div>
+ <div class="card balance"><div class="label">MOP</div><div class="value" id="bank-mop">0</div></div>
+ <div class="card balance"><div class="label">HKD</div><div class="value" id="bank-hkd">0</div></div>
+ <div class="card balance"><div class="label">CNY</div><div class="value" id="bank-cny">0</div></div>
  </div>
- <!-- net-total-mop kept for JS updates (hidden) -->
- <div id="net-total-mop" class="hidden" aria-hidden="true">MOP 0</div>
  </div>
  <div class="section-collapse-body">
- <div id="accounts-by-type"></div>
- <div id="no-accounts" class="empty-hint">尚未新增任何戶口</div>
+ <div id="accounts-bank-list" class="accounts-grid"></div>
+ <div id="no-bank-accounts" class="empty-hint">🏦 尚未新增銀行戶口<br><span style="font-size:0.8em;opacity:.85">到設定新增銀行戶口</span></div>
+ </div>
+ </section>
+ <section class="records-section collapsible-section" id="section-credit">
+ <div class="section-collapse-header" data-section="credit" role="button" tabindex="0">
+ <span class="section-collapse-title"><span class="sec-chevron">▼</span> 信用卡</span>
+ <span class="section-header-total" id="credit-section-total">MOP 0</span>
+ </div>
+ <div class="section-summary">
+ <div class="summary-cards currency-three currency-three-compact">
+ <div class="card balance"><div class="label">欠款 MOP</div><div class="value" id="credit-mop">0</div></div>
+ <div class="card balance"><div class="label">欠款 HKD</div><div class="value" id="credit-hkd">0</div></div>
+ <div class="card balance"><div class="label">欠款 CNY</div><div class="value" id="credit-cny">0</div></div>
+ </div>
+ </div>
+ <div class="section-collapse-body">
+ <div id="accounts-credit-list" class="accounts-grid"></div>
+ <div id="no-credit-accounts" class="empty-hint">💳 尚未新增信用卡<br><span style="font-size:0.8em;opacity:.85">到設定新增信用卡</span></div>
+ </div>
+ </section>
+ <!-- legacy ids for JS compatibility (hidden) -->
+ <div id="accounts-by-type" class="hidden" aria-hidden="true"></div>
+ <div id="no-accounts" class="hidden" aria-hidden="true"></div>
+ <div id="net-mop" class="hidden" aria-hidden="true">0</div>
+ <div id="net-hkd" class="hidden" aria-hidden="true">0</div>
+ <div id="net-cny" class="hidden" aria-hidden="true">0</div>
+ <div id="net-total-mop" class="hidden" aria-hidden="true">MOP 0</div>
+ <section class="records-section collapsible-section" id="section-accounts">
+ <div class="section-collapse-header" data-section="accounts" role="button" tabindex="0">
+ <span class="section-collapse-title"><span class="sec-chevron">▼</span> 投資／其他資產</span>
+ <span class="section-header-total" id="invest-section-total">MOP 0</span>
+ </div>
+ <div class="section-collapse-body">
+ <div id="accounts-invest-list" class="accounts-grid"></div>
+ <div id="no-invest-accounts" class="empty-hint">📈 尚無投資或其他資產戶口</div>
  </div>
  </section>
  <section class="records-section collapsible-section" id="section-mpf">
@@ -1973,6 +2430,7 @@ form { padding: 14px 18px 20px; }
  <!-- 記帳頁設定 -->
  <div id="settings-monthly-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3>設定</h3>
  <button type="button" id="btn-close-settings-monthly" class="btn-icon">×</button>
@@ -1995,6 +2453,7 @@ form { padding: 14px 18px 20px; }
  <!-- 常用模板管理 -->
  <div id="templates-modal-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3>常用模板</h3>
  <button type="button" id="btn-close-templates" class="btn-icon">×</button>
@@ -2011,6 +2470,7 @@ form { padding: 14px 18px 20px; }
  <!-- 分類管理 -->
  <div id="categories-modal-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3>分類管理</h3>
  <button type="button" id="btn-close-categories" class="btn-icon">×</button>
@@ -2115,6 +2575,7 @@ form { padding: 14px 18px 20px; }
  <!-- 資產頁設定 -->
  <div id="settings-assets-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3>新增</h3>
  <button type="button" id="btn-close-settings-assets" class="btn-icon">×</button>
@@ -2130,6 +2591,7 @@ form { padding: 14px 18px 20px; }
  <!-- 紀錄操作（點擊紀錄後） -->
  <div id="record-action-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3 id="record-action-title">紀錄</h3>
  <button type="button" id="btn-close-record-action" class="btn-icon">×</button>
@@ -2273,6 +2735,7 @@ form { padding: 14px 18px 20px; }
  <!-- 戶口詳情 / 流水 -->
  <div id="account-detail-modal-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3 id="account-detail-title">戶口詳情</h3>
  <button type="button" id="btn-close-account-detail" class="btn-icon">×</button>
@@ -2534,6 +2997,7 @@ form { padding: 14px 18px 20px; }
  <!-- 強積金詳情 -->
  <div id="mpf-detail-modal-overlay" class="modal-overlay hidden">
  <div class="modal modal-sheet">
+ <div class="modal-sheet-handle" aria-hidden="true"></div>
  <div class="modal-header">
  <h3 id="mpf-detail-title">強積金</h3>
  <button type="button" id="btn-close-mpf-detail" class="btn-icon">×</button>
@@ -4111,7 +4575,7 @@ let currentPage = 'monthly';
 let filters = { type: '', category: '', account: '', currency: '' };
 let expandedAccountId = null;
 let expandedAccountTypes = new Set(); // 空 = 各類型預設收合
-let sectionCollapseState = { dist: false, accounts: false, mpf: false, liabilities: false, otherAccounts: false };
+let sectionCollapseState = { dist: false, accounts: false, bank: false, credit: false, mpf: false, liabilities: false, otherAccounts: false };
 let ledgerFilterMonth = ''; // '' = 全部, 'YYYY-MM'
 let expandedMpfId = null;
 let expandedAssetGroup = null; // e.g. '銀行'
@@ -4661,23 +5125,39 @@ function switchPage(page) {
   if (el) el.classList.add('active');
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   $$('.page-only').forEach(btn => btn.classList.toggle('hidden', btn.dataset.page !== page));
-  if (page === 'monthly') renderMonthly();
-  else if (page === 'analysis') renderAnalysis();
-  else if (page === 'assets') renderAssets();
-  else if (page === 'budget') renderBudgetPage();
+  // 離開分析頁時關掉所有子面板，避免殘留顯示擋住其他頁
+  if (page !== 'analysis') {
+    $$('.analysis-panel').forEach(p => p.classList.remove('active'));
+  }
+  try {
+    if (page === 'monthly') renderMonthly();
+    else if (page === 'analysis') renderAnalysis();
+    else if (page === 'assets') renderAssets();
+    else if (page === 'budget') renderBudgetPage();
+  } catch (err) {
+    console.error('switchPage render error:', err);
+  }
 }
 
 let analysisSub = 'month';
 function switchAnalysisSub(sub) {
   if (sub === 'trend') sub = 'year';
+  if (sub !== 'month' && sub !== 'year' && sub !== 'assets') sub = 'month';
   analysisSub = sub;
   $$('.sub-tab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   const monthPanel = $('#analysis-month');
   const yearPanel = $('#analysis-year');
+  const assetsPanel = $('#analysis-assets');
   if (monthPanel) monthPanel.classList.toggle('active', sub === 'month');
   if (yearPanel) yearPanel.classList.toggle('active', sub === 'year');
-  if (sub === 'month') renderAnalysisMonth();
-  else if (sub === 'year') renderYearly();
+  if (assetsPanel) assetsPanel.classList.toggle('active', sub === 'assets');
+  try {
+    if (sub === 'month') renderAnalysisMonth();
+    else if (sub === 'year') renderYearly();
+    else if (sub === 'assets') renderAssetsHistory();
+  } catch (err) {
+    console.error('switchAnalysisSub render error:', err);
+  }
 }
 
 function renderAnalysis() {
@@ -6079,64 +6559,90 @@ function ledgerAmountView(r, accountId) {
 }
 
 function renderAccounts() {
-  const nets = { MOP: 0, HKD: 0, CNY: 0 };
-  netAssetAccounts().forEach(a => {
+  const bankNets = { MOP: 0, HKD: 0, CNY: 0 };
+  const creditNets = { MOP: 0, HKD: 0, CNY: 0 };
+  const investNets = { MOP: 0, HKD: 0, CNY: 0 };
+  accounts.forEach(a => {
     const b = a.balances || {};
-    nets.MOP += Number(b.MOP) || 0;
-    nets.HKD += Number(b.HKD) || 0;
-    nets.CNY += Number(b.CNY) || 0;
-  });
-  const netMopEl = $('#net-mop');
-  const netHkdEl = $('#net-hkd');
-  const netCnyEl = $('#net-cny');
-  const netTotalEl = $('#net-total-mop');
-  if (netMopEl) netMopEl.textContent = formatMoney(nets.MOP);
-  if (netHkdEl) netHkdEl.textContent = formatMoney(nets.HKD);
-  if (netCnyEl) netCnyEl.textContent = formatMoney(nets.CNY);
-  if (netTotalEl) netTotalEl.textContent = money('MOP', toMOP(nets.MOP, 'MOP') + toMOP(nets.HKD, 'HKD') + toMOP(nets.CNY, 'CNY'));
-
-  // 主戶口：雙欄網格卡片（釘選優先 + 可拖曳排序）
-  const MAIN_EXCLUDE = new Set(['電子錢包', '現金', '應收帳款']);
-  const mainAccounts = sortAccountsForDisplay(
-    accounts.filter(a => !MAIN_EXCLUDE.has(a.type))
-  );
-  const container = $('#accounts-by-type');
-  if (container) {
-    container.innerHTML = '';
-    container.classList.remove('accounts-flat');
-    container.classList.add('accounts-grid');
-    if (!mainAccounts.length) {
-      const noAcc = $('#no-accounts');
-      if (noAcc) noAcc.style.display = 'block';
-    } else {
-      const noAcc = $('#no-accounts');
-      if (noAcc) noAcc.style.display = 'none';
-      mainAccounts.forEach(a => {
-        const prim = accountPrimaryBalance(a);
-        const pinned = isAccountPinned(a.id);
-        const item = document.createElement('div');
-        item.className = 'account-grid-card' + (pinned ? ' pinned' : '');
-        item.dataset.id = a.id;
-        item.setAttribute('role', 'button');
-        item.tabIndex = 0;
-        item.draggable = true;
-        const negCls = prim.amount < 0 ? ' neg' : '';
-        item.innerHTML = `
-          ${pinned ? '<span class="pin-badge" title="已釘選">📌</span>' : ''}
-          <div class="account-grid-name">${escapeHtml(a.name)}</div>
-          <div class="account-grid-bal${negCls}">${money(prim.currency, prim.amount)}</div>`;
-        container.appendChild(item);
-      });
-      container.querySelectorAll('.account-grid-card').forEach(item => {
-        const open = () => openAccountDetailModal(item.dataset.id);
-        item.addEventListener('click', open);
-        item.addEventListener('keydown', e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-        });
-      });
-      bindAccountCardDrag(container);
+    const mop = Number(b.MOP) || 0;
+    const hkd = Number(b.HKD) || 0;
+    const cny = Number(b.CNY) || 0;
+    if (a.type === '銀行') {
+      bankNets.MOP += mop; bankNets.HKD += hkd; bankNets.CNY += cny;
+    } else if (a.type === '信用卡') {
+      creditNets.MOP += mop; creditNets.HKD += hkd; creditNets.CNY += cny;
+    } else if (a.type === '投資' || a.type === '其他') {
+      investNets.MOP += mop; investNets.HKD += hkd; investNets.CNY += cny;
     }
+  });
+  const set3 = (prefix, nets) => {
+    const m = $('#' + prefix + '-mop');
+    const h = $('#' + prefix + '-hkd');
+    const c = $('#' + prefix + '-cny');
+    if (m) m.textContent = formatMoney(nets.MOP);
+    if (h) h.textContent = formatMoney(nets.HKD);
+    if (c) c.textContent = formatMoney(nets.CNY);
+  };
+  set3('bank', bankNets);
+  set3('credit', creditNets);
+  // legacy net-* (銀行+投資+其他，不含信用卡)
+  const legacy = {
+    MOP: bankNets.MOP + investNets.MOP,
+    HKD: bankNets.HKD + investNets.HKD,
+    CNY: bankNets.CNY + investNets.CNY
+  };
+  set3('net', legacy);
+  const bankTotalMop = toMOP(bankNets.MOP, 'MOP') + toMOP(bankNets.HKD, 'HKD') + toMOP(bankNets.CNY, 'CNY');
+  const creditTotalMop = toMOP(creditNets.MOP, 'MOP') + toMOP(creditNets.HKD, 'HKD') + toMOP(creditNets.CNY, 'CNY');
+  const investTotalMop = toMOP(investNets.MOP, 'MOP') + toMOP(investNets.HKD, 'HKD') + toMOP(investNets.CNY, 'CNY');
+  if ($('#bank-section-total')) $('#bank-section-total').textContent = money('MOP', bankTotalMop);
+  if ($('#credit-section-total')) $('#credit-section-total').textContent = money('MOP', creditTotalMop);
+  if ($('#invest-section-total')) $('#invest-section-total').textContent = money('MOP', investTotalMop);
+  if ($('#net-total-mop')) $('#net-total-mop').textContent = money('MOP', bankTotalMop + investTotalMop);
+
+  function fillAccountGrid(containerSel, emptySel, list) {
+    const container = $(containerSel);
+    const noEl = $(emptySel);
+    if (!container) return;
+    container.innerHTML = '';
+    container.classList.add('accounts-grid');
+    if (!list.length) {
+      if (noEl) noEl.style.display = 'block';
+      return;
+    }
+    if (noEl) noEl.style.display = 'none';
+    list.forEach(a => {
+      const prim = accountPrimaryBalance(a);
+      const pinned = isAccountPinned(a.id);
+      const item = document.createElement('div');
+      item.className = 'account-grid-card' + (pinned ? ' pinned' : '');
+      item.dataset.id = a.id;
+      item.setAttribute('role', 'button');
+      item.tabIndex = 0;
+      item.draggable = true;
+      const negCls = prim.amount < 0 ? ' neg' : '';
+      item.innerHTML = `
+        ${pinned ? '<span class="pin-badge" title="已釘選">📌</span>' : ''}
+        <div class="account-grid-name">${escapeHtml(a.name)}</div>
+        <div class="account-grid-bal${negCls}">${money(prim.currency, prim.amount)}</div>`;
+      container.appendChild(item);
+    });
+    container.querySelectorAll('.account-grid-card').forEach(item => {
+      const open = () => openAccountDetailModal(item.dataset.id);
+      item.addEventListener('click', open);
+      item.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+    bindAccountCardDrag(container);
   }
+
+  fillAccountGrid('#accounts-bank-list', '#no-bank-accounts',
+    sortAccountsForDisplay(accounts.filter(a => a.type === '銀行')));
+  fillAccountGrid('#accounts-credit-list', '#no-credit-accounts',
+    sortAccountsForDisplay(accounts.filter(a => a.type === '信用卡')));
+  fillAccountGrid('#accounts-invest-list', '#no-invest-accounts',
+    sortAccountsForDisplay(accounts.filter(a => a.type === '投資' || a.type === '其他')));
 
   // 其他：電子錢包、現金、應收帳款（雙欄網格）
   const OTHER_TYPES = ['電子錢包', '現金', '應收帳款'];
@@ -8139,6 +8645,193 @@ function mpfToHKD(a) {
   return convertAmount(Number(a.balance) || 0, mpfCurrency(a), 'HKD');
 }
 
+
+/** 計算指定日期（含）當日結束時的戶口餘額：由目前餘額倒推 date 之後的流水 */
+function rebuildBalancesAsOf(asOfDate) {
+  const balMap = {};
+  accounts.forEach(a => {
+    const b = a.balances || {};
+    balMap[a.id] = {
+      MOP: Number(b.MOP) || 0,
+      HKD: Number(b.HKD) || 0,
+      CNY: Number(b.CNY) || 0,
+      type: a.type
+    };
+  });
+  const applyDelta = (id, cur, delta) => {
+    if (!id || !balMap[id]) return;
+    const c = cur || 'MOP';
+    if (!(c in balMap[id])) balMap[id][c] = 0;
+    balMap[id][c] = Math.round((Number(balMap[id][c]) + delta) * 100) / 100;
+  };
+  // 倒推：套用 reverseRecordEffect 邏輯於餘額表
+  const after = records
+    .filter(r => String(r.date || '').slice(0, 10) > asOfDate)
+    .sort((a, b) => {
+      const da = String(b.date || '').localeCompare(String(a.date || ''));
+      if (da !== 0) return da;
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+  after.forEach(rec => {
+    if (!rec) return;
+    if (isInterest(rec)) {
+      applyDelta(rec.accountId, rec.currency, -(Number(rec.amount) || 0));
+      return;
+    }
+    if (isSavings(rec)) return; // 存錢不影響戶口餘額
+    if (isAdvance(rec)) {
+      const total = Number(rec.amount) || 0;
+      const recvAmt = Number(rec.recvAmount) || 0;
+      const payAcc = accounts.find(a => a.id === rec.accountId);
+      if (payAcc && payAcc.type === '信用卡') applyDelta(rec.accountId, rec.currency, -total);
+      else applyDelta(rec.accountId, rec.currency, total);
+      if (rec.recvAccountId && recvAmt) applyDelta(rec.recvAccountId, rec.currency, -recvAmt);
+      return;
+    }
+    if (isTransfer(rec)) {
+      applyDelta(rec.accountId, rec.currency, Number(rec.amount) || 0);
+      applyDelta(rec.toAccountId, rec.toCurrency || rec.currency, -(Number(rec.toAmount ?? rec.amount) || 0));
+      return;
+    }
+    if (isRepayment(rec)) {
+      const amt = Number(rec.amount) || 0;
+      applyDelta(rec.accountId, rec.currency, amt);
+      if (rec.repayToId) applyDelta(rec.repayToId, rec.currency, amt);
+      return;
+    }
+    const amt = Number(rec.amount) || 0;
+    const effectId = rec.accountId;
+    const acc = accounts.find(a => a.id === effectId);
+    if (!acc) return;
+    if (acc.type === '信用卡') applyDelta(effectId, rec.currency, rec.type === 'expense' ? -amt : amt);
+    else applyDelta(effectId, rec.currency, rec.type === 'expense' ? amt : -amt);
+  });
+  return balMap;
+}
+
+function mpfBalanceAsOfMonth(year, month) {
+  // month 0-based; 取 monthKey 或之前最近一筆 snapshot
+  const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+  let totalMop = 0;
+  (mpfData.accounts || []).forEach(acc => {
+    const snaps = [...(acc.snapshots || [])].filter(s => s.month && s.month <= key).sort((a, b) => b.month.localeCompare(a.month));
+    let bal;
+    if (snaps.length) bal = Number(snaps[0].balance) || 0;
+    else {
+      // 若無歷史 snapshot：僅當「當前月或之後」才用現時結餘，否則視為 0
+      const now = new Date();
+      const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      bal = key >= curKey ? (Number(acc.balance) || 0) : 0;
+    }
+    totalMop += toMOP(bal, mpfCurrency(acc));
+  });
+  return totalMop;
+}
+
+function lastDayOfMonth(year, month) {
+  // month 0-based
+  const d = new Date(year, month + 1, 0);
+  return formatDateLocal(d);
+}
+
+/** 與資產頁相同公式：總資產 / 總存款 / 淨資產（截至 asOfDate） */
+function calcAssetMetricsAsOf(asOfDate, year, month) {
+  const balMap = rebuildBalancesAsOf(asOfDate);
+  let bankMop = 0, otherMop = 0;
+  Object.keys(balMap).forEach(id => {
+    const row = balMap[id];
+    if (row.type === '電子錢包' || row.type === '信用卡' || row.type === '應收帳款') return;
+    const mop = toMOP(row.MOP, 'MOP') + toMOP(row.HKD, 'HKD') + toMOP(row.CNY, 'CNY');
+    if (row.type === '銀行') bankMop += mop;
+    else otherMop += mop;
+  });
+  const mpfTotal = mpfBalanceAsOfMonth(year, month);
+  const gross = bankMop + otherMop + mpfTotal;
+  let otherLiab = 0;
+  liabilities.forEach(l => { otherLiab += balancesToMOP(l.balances); });
+  const totalLiab = otherLiab;
+  const deposit = gross - totalLiab - mpfTotal;
+  const net = gross - totalLiab;
+  return { gross, deposit, net, bankMop, otherMop, mpfTotal, totalLiab };
+}
+
+let assetsHistoryYear = new Date().getFullYear();
+
+function renderAssetsHistory() {
+  const label = $('#assets-history-year-label');
+  if (label) label.textContent = `${assetsHistoryYear}年`;
+  const body = $('#assets-history-body');
+  const noEl = $('#no-assets-history');
+  const barsEl = $('#assets-history-bars');
+  if (!body) return;
+
+  let rows = [];
+  try {
+  const now = new Date();
+  const maxMonth = (assetsHistoryYear === now.getFullYear()) ? now.getMonth() : 11;
+  for (let m = 0; m <= maxMonth; m++) {
+    const asOf = lastDayOfMonth(assetsHistoryYear, m);
+    // 若尚未到該月最後一天，用今天
+    const today = todayLocalStr();
+    const useDate = asOf > today ? today : asOf;
+    const metrics = calcAssetMetricsAsOf(useDate, assetsHistoryYear, m);
+    rows.push({ month: m, asOf: useDate, ...metrics });
+  }
+  } catch (err) {
+    console.error('renderAssetsHistory:', err);
+    rows = [];
+  }
+
+  if (!rows.length) {
+    body.innerHTML = '';
+    if (noEl) noEl.style.display = 'block';
+    if (barsEl) barsEl.innerHTML = '';
+    return;
+  }
+  if (noEl) noEl.style.display = 'none';
+
+  const latest = rows[rows.length - 1];
+  if ($('#ah-latest-deposit')) $('#ah-latest-deposit').textContent = money('MOP', latest.deposit);
+  if ($('#ah-latest-gross')) $('#ah-latest-gross').textContent = money('MOP', latest.gross);
+  if ($('#ah-latest-net')) $('#ah-latest-net').textContent = money('MOP', latest.net);
+
+  let html = '';
+  rows.slice().reverse().forEach((r, i, arr) => {
+    // arr is reversed: index 0 = latest; prev month is next in original
+    const origIdx = rows.length - 1 - i;
+    const prev = origIdx > 0 ? rows[origIdx - 1] : null;
+    const delta = prev ? (r.net - prev.net) : null;
+    let deltaHtml = '—';
+    if (delta != null) {
+      const cls = delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : '';
+      const sign = delta > 0 ? '+' : '';
+      deltaHtml = `<span class="${cls}">${sign}${formatMoney(delta)}</span>`;
+    }
+    const isLatest = origIdx === rows.length - 1;
+    html += `<tr>
+      <td>${assetsHistoryYear}年${r.month + 1}月${isLatest ? '（最新）' : ''}</td>
+      <td>${formatMoney(r.deposit)}</td>
+      <td>${formatMoney(r.gross)}</td>
+      <td>${formatMoney(r.net)}</td>
+      <td>${deltaHtml}</td>
+    </tr>`;
+  });
+  body.innerHTML = html;
+
+  if (barsEl) {
+    const maxAbs = Math.max(...rows.map(r => Math.abs(r.net)), 1);
+    barsEl.innerHTML = rows.map(r => {
+      const pct = Math.min(100, Math.round(Math.abs(r.net) / maxAbs * 100));
+      const color = r.net < 0 ? 'var(--expense)' : 'var(--grad-primary)';
+      return `<div class="bar-row">
+        <div class="bar-row-top"><span class="bar-label">${r.month + 1}月</span><span class="bar-val">${formatMoney(r.net)}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${r.net < 0 ? 'linear-gradient(90deg,#F43F5E,#FB7185)' : ''}"></div></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+
 function renderAssets() {
   let bankMop = 0, otherMop = 0;
   accounts.forEach(a => {
@@ -8713,7 +9406,7 @@ async function clearAllData() {
   expandedAccountTypes = new Set();
   expandedMpfId = null;
   expandedAssetGroup = null;
-  sectionCollapseState = { dist: false, accounts: false, mpf: false, liabilities: false, otherAccounts: false };
+  sectionCollapseState = { dist: false, accounts: false, bank: false, credit: false, mpf: false, liabilities: false, otherAccounts: false };
 
   try {
     // 取消尚未寫入的佇列，避免清空後又被 flush 寫回舊資料
@@ -9035,6 +9728,8 @@ function init() {
 
   $('#btn-prev-year').addEventListener('click', () => { currentYear--; renderYearly(); });
   $('#btn-next-year').addEventListener('click', () => { currentYear++; renderYearly(); });
+  $('#btn-prev-year-assets')?.addEventListener('click', () => { assetsHistoryYear--; renderAssetsHistory(); });
+  $('#btn-next-year-assets')?.addEventListener('click', () => { assetsHistoryYear++; renderAssetsHistory(); });
   const btnPrevMA = $('#btn-prev-month-analysis');
   const btnNextMA = $('#btn-next-month-analysis');
   if (btnPrevMA) btnPrevMA.addEventListener('click', () => changeMonth(-1));
