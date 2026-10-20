@@ -193,6 +193,17 @@ header h1 {
 .summary-cards.currency-three { grid-template-columns: repeat(3, 1fr); }
 .summary-cards.currency-four { grid-template-columns: repeat(4, 1fr); }
 .summary-cards.summary-monthly { grid-template-columns: repeat(2, 1fr); }
+.summary-cards.summary-monthly .card.summary-clickable {
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.summary-cards.summary-monthly .card.summary-clickable:active {
+  transform: scale(0.98);
+}
+.summary-cards.summary-monthly .card.summary-clickable:hover {
+  box-shadow: var(--shadow);
+  border-color: rgba(79, 70, 229, 0.28);
+}
 .summary-cards.summary-stackable { grid-template-columns: 1fr 1fr; }
 .summary-cards.summary-stackable .summary-bottom { grid-column: 1 / -1; }
 .summary-cards.summary-analysis-month { grid-template-columns: repeat(2, 1fr); margin-bottom: 8px; }
@@ -1134,7 +1145,7 @@ form { padding: 14px 18px 20px; }
   }
   #accounts-by-type { gap: 10px; }
   #accounts-by-type .type-group { margin-bottom: 0; }
-  .summary-cards.summary-monthly { grid-template-columns: repeat(4, 1fr); }
+  .summary-cards.summary-monthly { grid-template-columns: repeat(5, 1fr); }
   .summary-cards.summary-assets { grid-template-columns: repeat(4, 1fr); }
   .assets-hero .value { font-size: 1.75rem; }
   .summary-cards.summary-assets-secondary .card .value { font-size: 0.9rem; }
@@ -2032,11 +2043,15 @@ form { padding: 14px 18px 20px; }
  <button type="button" id="btn-next-month" class="btn-icon">›</button>
  </div>
  <div class="summary-cards summary-monthly">
- <div class="card expense">
+ <div class="card income summary-clickable" id="card-summary-income" role="button" tabindex="0" title="點擊查看收入明細">
+ <div class="label">收入</div>
+ <div class="value" id="summary-income">0</div>
+ </div>
+ <div class="card expense summary-clickable" id="card-summary-expense" role="button" tabindex="0" title="點擊查看消費支出明細">
  <div class="label">消費支出</div>
  <div class="value" id="summary-expense">0</div>
  </div>
- <div class="card expense">
+ <div class="card expense summary-clickable" id="card-summary-expense-all" role="button" tabindex="0" title="點擊查看實際支出明細">
  <div class="label">實際支出</div>
  <div class="value" id="summary-expense-all">0</div>
  </div>
@@ -2049,7 +2064,7 @@ form { padding: 14px 18px 20px; }
  <div class="value" id="summary-cashflow">0</div>
  </div>
  </div>
- <p class="summary-hint">結餘＝收入−消費支出−存錢　｜　現金流結餘＝收入−實際支出−存錢</p>
+ <p class="summary-hint">點擊收入／消費支出／實際支出可查看明細　｜　結餘＝收入−消費支出−存錢　｜　現金流結餘＝收入−實際支出−存錢</p>
  <div class="page-actions">
  <button type="button" id="btn-add" class="btn primary">＋ 新增</button>
  <button type="button" id="btn-copy-last" class="btn btn-copy-last" title="複製上筆">📋 上筆</button>
@@ -2164,8 +2179,10 @@ form { padding: 14px 18px 20px; }
  </section>
  <section class="chart-section">
  <h3>年度消費支出分類</h3>
+ <p class="field-hint" style="margin-bottom:10px">點選分類可查看該分類全年支出流水</p>
  <div id="yearlyCategoryBars" class="bar-list"></div>
  <div id="no-year-cat-data" class="empty-hint" style="display:none">本年尚無支出</div>
+ <div id="year-cat-detail" class="custom-cat-records"></div>
  </section>
  <section class="chart-section" id="year-custom-cat-sum-section">
  <h3>自訂支出加總（勾選要合計的分類）</h3>
@@ -2805,7 +2822,19 @@ form { padding: 14px 18px 20px; }
  <button type="button" id="btn-account-detail-edit" class="btn">✎ 編輯</button>
  <button type="button" id="btn-account-detail-delete" class="btn danger-outline">刪除</button>
  </div>
- <div class="ledger-title" style="margin:4px 0 8px">流水帳（按月份展開）</div>
+ <div class="section-header" style="margin:4px 0 8px">
+ <div class="ledger-title" style="margin:0">流水帳（按月份展開）</div>
+ <div class="section-header-actions">
+ <button type="button" id="btn-ledger-expand-all" class="btn btn-sm btn-expand-all" title="展開全部月份">展開全部</button>
+ <button type="button" id="btn-ledger-collapse-all" class="btn btn-sm btn-expand-all" title="全部收合">全部收合</button>
+ </div>
+ </div>
+ <div class="account-detail-filter ledger-filter" style="margin-bottom:10px">
+ <label for="account-ledger-month-filter">月份</label>
+ <select id="account-ledger-month-filter">
+ <option value="">全部月份</option>
+ </select>
+ </div>
  <div id="account-detail-ledger" class="account-detail-ledger"></div>
  </div>
  </div>
@@ -3452,20 +3481,48 @@ function refreshCategoryIcons() {
 function catIcon(name) {
   return (CATEGORY_ICONS && CATEGORY_ICONS[name]) || '🏷️';
 }
+function ensureCatalogHasUsedCategories() {
+  // 把歷史紀錄中出現過、但目錄沒有的分類自動納入，讓任何時間都可選
+  if (!Array.isArray(records) || !records.length) return;
+  const hide = new Set(['代墊','存錢','收回應收','利息收入','內部轉帳']);
+  const known = new Set(categoryCatalog.map(c => c.name));
+  let added = false;
+  records.forEach(r => {
+    const name = (r && r.category) ? String(r.category).trim() : '';
+    if (!name || hide.has(name) || known.has(name)) return;
+    known.add(name);
+    categoryCatalog.push({ id: 'c_' + genId(), name, icon: '🏷️' });
+    added = true;
+  });
+  if (added) {
+    try { saveCategoryCatalog(); } catch (_) {}
+    try { refreshCategoryIcons(); } catch (_) {}
+  }
+}
+
 function getSelectableCategories() {
+  ensureCatalogHasUsedCategories();
   const hide = new Set(['代墊','存錢','收回應收','利息收入','內部轉帳']);
   const list = categoryCatalog.filter(c => !hide.has(c.name)).map(c => ({
     name: c.name,
-    icon: c.icon || '🏷️'
+    icon: c.icon || CATEGORY_ICONS[c.name] || '🏷️'
   }));
-  const otherIdx = list.findIndex(c => c.name === '其他');
+  // 去重（保序）
+  const seen = new Set();
+  const uniq = [];
+  list.forEach(c => {
+    if (seen.has(c.name)) return;
+    seen.add(c.name);
+    uniq.push(c);
+  });
+  const otherIdx = uniq.findIndex(c => c.name === '其他');
   if (otherIdx >= 0) {
-    const [ot] = list.splice(otherIdx, 1);
-    list.push(ot);
-  } else if (!list.some(c => c.name === '其他')) {
-    list.push({ name: '其他', icon: '🏷️' });
+    const [ot] = uniq.splice(otherIdx, 1);
+    uniq.push(ot);
+  } else if (!uniq.some(c => c.name === '其他')) {
+    uniq.push({ name: '其他', icon: '🏷️' });
   }
-  return list;
+  return uniq;
 }
 function getAllCategoryNames() {
   return categoryCatalog.map(c => c.name);
@@ -5819,6 +5876,7 @@ function populateFilterOptions() {
 function renderMonthly() {
   $('#current-month-label').textContent = `${currentYear}年${currentMonth + 1}月`;
   const s = getMonthSummary();
+  if ($('#summary-income')) $('#summary-income').textContent = formatMoney(s.income);
   $('#summary-expense').textContent = formatMoney(s.consumption);
   $('#summary-expense-all').textContent = formatMoney(s.actual);
   const balEl = $('#summary-balance');
@@ -5833,10 +5891,120 @@ function renderMonthly() {
     const cashCard = cashEl.closest('.card');
     if (cashCard) cashCard.classList.toggle('warn-negative', s.cashflow < 0);
   }
+  bindSummaryDetailClicks();
   populateFilterOptions();
   renderMonthRecords();
   renderFilterChips();
   renderTemplatesBar();
+}
+
+/** 摘要卡點擊 → 明細列表 */
+function bindSummaryDetailClicks() {
+  const map = [
+    ['card-summary-income', 'income'],
+    ['card-summary-expense', 'consumption'],
+    ['card-summary-expense-all', 'actual']
+  ];
+  map.forEach(([id, kind]) => {
+    const el = $('#' + id);
+    if (!el || el.dataset.boundSummary) return;
+    el.dataset.boundSummary = '1';
+    const go = () => openSummaryDetailModal(kind);
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+    });
+  });
+}
+
+/**
+ * kind: 'income' | 'consumption' | 'actual'
+ * 列出本月對應流水
+ */
+function getSummaryDetailRecords(kind) {
+  const list = [];
+  getMonthRecords().forEach(r => {
+    if (kind === 'income') {
+      if (isInterest(r)) return; // 利息不計入月結餘收入
+      if (r.type === 'income' && !isTransfer(r) && !isCollectReceivable(r)) list.push(r);
+      return;
+    }
+    if (isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
+    if (kind === 'consumption') {
+      // 消費支出：不含還款、不含「不計消費」、代墊只計自費
+      if (isRepayment(r)) return;
+      if (isExcludeConsumption(r)) return;
+      if (isAdvance(r)) {
+        if ((Number(r.selfAmount) || 0) > 0) list.push(r);
+        return;
+      }
+      if (r.type === 'expense') list.push(r);
+      return;
+    }
+    if (kind === 'actual') {
+      // 實際支出：非刷卡消費 + 還款 + 不計消費之非刷卡支出（代墊自費同理）
+      if (isRepayment(r)) { list.push(r); return; }
+      if (isAdvance(r)) {
+        const selfAmt = Number(r.selfAmount) || 0;
+        if (selfAmt <= 0) return;
+        const payAcc = findAccountById(r.accountId);
+        if (payAcc && payAcc.type === '信用卡') return; // 刷卡代墊待還款才計實際
+        list.push(r);
+        return;
+      }
+      if (r.type !== 'expense') return;
+      if (isCreditCardPurchase(r)) return; // 刷卡消費待還款
+      list.push(r);
+    }
+  });
+  return list.sort((a, b) =>
+    String(b.date || '').localeCompare(String(a.date || '')) ||
+    String(b.id).localeCompare(String(a.id))
+  );
+}
+
+function openSummaryDetailModal(kind) {
+  const titles = {
+    income: '本月收入明細',
+    consumption: '本月消費支出明細',
+    actual: '本月實際支出明細'
+  };
+  const title = titles[kind] || '明細';
+  const list = getSummaryDetailRecords(kind);
+  const overlay = $('#cat-records-modal-overlay');
+  const titleEl = $('#cat-records-title');
+  const box = $('#cat-records-list');
+  if (!overlay || !box) return;
+  if (titleEl) titleEl.textContent = title;
+  if (!list.length) {
+    box.innerHTML = '<div class="empty-hint">本月尚無相關紀錄</div>';
+  } else {
+    let totalMop = 0;
+    list.forEach(r => {
+      if (kind === 'income') totalMop += toMOP(r.amount, r.currency);
+      else if (isAdvance(r)) totalMop += toMOP(Number(r.selfAmount) || 0, r.currency);
+      else totalMop += toMOP(r.amount, r.currency);
+    });
+    const byDate = {};
+    list.forEach(r => {
+      const d = String(r.date || '').slice(0, 10);
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(r);
+    });
+    let html = `<div class="custom-cat-records-title">合計 MOP ${formatMoney(totalMop)}（${list.length} 筆）</div>`;
+    Object.keys(byDate).sort((a, b) => b.localeCompare(a)).forEach(date => {
+      html += `<div class="day-group expanded">
+        <div class="day-header"><span class="day-date">${date}</span></div>
+        <div class="day-records">${byDate[date].map(r => buildRecordItemHtml(r)).join('')}</div>
+      </div>`;
+    });
+    box.innerHTML = html;
+    bindRecordActions(box);
+  }
+  overlay.classList.remove('hidden');
+}
+function closeCatRecordsModal() {
+  $('#cat-records-modal-overlay')?.classList.add('hidden');
 }
 
 function renderMonthBars() {
@@ -6068,7 +6236,7 @@ function ensureGlobalRecordDelegation() {
   if (_recordDelegationBound) return;
   _recordDelegationBound = true;
   // 記帳列表、自訂分類流水、戶口明細等常見容器
-  ['records-list', 'custom-cat-records', 'year-tag-detail', 'account-detail-ledger', 'budget-savings-list'].forEach(id => {
+  ['records-list', 'custom-cat-records', 'year-tag-detail', 'year-cat-detail', 'account-detail-ledger', 'budget-savings-list', 'cat-records-list'].forEach(id => {
     const node = document.getElementById(id);
     if (node) bindRecordActions(node);
   });
@@ -6118,6 +6286,7 @@ function refreshDayGroup(dateStr) {
   // 摘要可能變動，輕量更新本月數字
   try {
     const s = getMonthSummary();
+    if ($('#summary-income')) $('#summary-income').textContent = formatMoney(s.income);
     if ($('#summary-expense')) $('#summary-expense').textContent = formatMoney(s.consumption);
     if ($('#summary-expense-all')) $('#summary-expense-all').textContent = formatMoney(s.actual);
     if ($('#summary-balance')) {
@@ -6355,6 +6524,61 @@ function parseTagsInput(val) {
 }
 
 let selectedYearTag = null;
+let selectedYearCategory = null;
+
+/** 年度分類點選 → 顯示該分類全年支出流水 */
+function renderYearCategoryDetail(byCat) {
+  const detailEl = $('#year-cat-detail');
+  if (!detailEl) return;
+  if (!selectedYearCategory) {
+    detailEl.innerHTML = '<p class="cat-sum-hint">點選上方分類可查看該分類全年支出流水</p>';
+    return;
+  }
+  const cat = selectedYearCategory;
+  const list = [];
+  getYearRecords().forEach(r => {
+    if (isRepayment(r) || isCollectReceivable(r) || isInterest(r) || isTransfer(r) || isSavings(r) || isAdjustment(r)) return;
+    if (isAdvance(r)) {
+      const selfAmt = Number(r.selfAmount) || 0;
+      if (selfAmt <= 0) return;
+      if ((r.category || '其他') !== cat) return;
+      list.push(r);
+      return;
+    }
+    if (r.type !== 'expense') return;
+    if ((r.category || '其他') !== cat) return;
+    list.push(r);
+  });
+  list.sort((a, b) =>
+    String(b.date || '').localeCompare(String(a.date || '')) ||
+    String(b.id).localeCompare(String(a.id))
+  );
+  const total = (byCat && byCat[cat] != null) ? byCat[cat] : list.reduce((s, r) => {
+    if (isAdvance(r)) return s + toMOP(Number(r.selfAmount) || 0, r.currency);
+    return s + toMOP(r.amount, r.currency);
+  }, 0);
+  let html = `<div class="custom-cat-records-title">${CATEGORY_ICONS[cat] || '🏷️'} ${escapeHtml(cat)} · 本年合計 MOP ${formatMoney(total)}（${list.length} 筆）</div>`;
+  if (!list.length) {
+    html += '<div class="empty-hint">尚無流水</div>';
+  } else {
+    const byDate = {};
+    list.forEach(r => {
+      const d = String(r.date || '').slice(0, 10);
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(r);
+    });
+    Object.keys(byDate).sort((a, b) => b.localeCompare(a)).forEach(date => {
+      html += `<div class="day-group expanded">
+        <div class="day-header"><span class="day-date">${date}</span></div>
+        <div class="day-records">${byDate[date].map(r => buildRecordItemHtml(r)).join('')}</div>
+      </div>`;
+    });
+  }
+  detailEl.innerHTML = html;
+  bindRecordActions(detailEl);
+  try { detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+}
+
 function renderYearTags() {
   const listEl = $('#year-tags-list');
   const detailEl = $('#year-tag-detail');
@@ -6438,6 +6662,7 @@ function renderYearTags() {
 
 function renderYearly() {
   $('#current-year-label').textContent = `${currentYear}年`;
+  selectedYearCategory = null;
   const yearRecs = getYearRecords();
   let income = 0, consumption = 0, savings = 0;
   const monthsInc = Array(12).fill(0);
@@ -6509,14 +6734,22 @@ function renderYearly() {
   if (!Object.keys(byCat).length) {
     $('#yearlyCategoryBars').innerHTML = '';
     $('#no-year-cat-data').style.display = 'block';
+    const ycd = $('#year-cat-detail');
+    if (ycd) ycd.innerHTML = '';
+    selectedYearCategory = null;
   } else {
     $('#no-year-cat-data').style.display = 'none';
     const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
     renderBarList($('#yearlyCategoryBars'), sorted.map(([c, v]) => ({
       label: `${CATEGORY_ICONS[c] || '🏷️'} ${c}`,
       value: v,
-      category: c
+      category: c,
+      onClick: () => {
+        selectedYearCategory = selectedYearCategory === c ? null : c;
+        renderYearCategoryDetail(byCat);
+      }
     })));
+    renderYearCategoryDetail(byCat);
   }
 
   renderYearCustomCatSum(byCat);
@@ -6886,6 +7119,7 @@ function openAccountDetailModal(accountId) {
   const a = accounts.find(x => x.id === accountId);
   if (!a) return;
   expandedAccountId = accountId;
+  _accountLedgerFilterMonth = '';
   const overlay = $('#account-detail-modal-overlay');
   if (!overlay) return;
   $('#account-detail-title').textContent = `${ACCOUNT_TYPE_ICONS[a.type] || ''} ${a.name}`;
@@ -6964,10 +7198,14 @@ function buildLedgerItemHtml(r, accountId, isWallet) {
   </div>`;
 }
 
+let _accountLedgerFilterMonth = '';
+let _accountLedgerViewId = '';
+
 function renderAccountDetailLedger(accountId) {
   const a = accounts.find(x => x.id === accountId);
   const box = $('#account-detail-ledger');
   if (!a || !box) return;
+  _accountLedgerViewId = accountId;
   const isWallet = a.type === '電子錢包';
   let ledger;
   if (isWallet) {
@@ -6976,10 +7214,6 @@ function renderAccountDetailLedger(accountId) {
       .sort(sortByInputTime);
   } else {
     ledger = getAccountLedger(a.id, '');
-  }
-  if (!ledger.length) {
-    box.innerHTML = '<div class="ledger-empty">尚無流水紀錄</div>';
-    return;
   }
   // 依月份分組（新→舊）
   const byMonth = {};
@@ -6990,13 +7224,62 @@ function renderAccountDetailLedger(accountId) {
     byMonth[m].push(r);
   });
   const months = Object.keys(byMonth).sort((x, y) => y.localeCompare(x));
-  if (!months.length) {
+
+  // 月份篩選下拉
+  const monthSel = $('#account-ledger-month-filter');
+  if (monthSel) {
+    const prev = _accountLedgerFilterMonth;
+    monthSel.innerHTML = '<option value="">全部月份</option>';
+    months.forEach(m => {
+      const [y, mo] = m.split('-');
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = `${y}年${Number(mo)}月（${byMonth[m].length}）`;
+      monthSel.appendChild(o);
+    });
+    if (prev && months.includes(prev)) {
+      monthSel.value = prev;
+      _accountLedgerFilterMonth = prev;
+    } else {
+      monthSel.value = '';
+      _accountLedgerFilterMonth = '';
+    }
+    if (!monthSel.dataset.bound) {
+      monthSel.dataset.bound = '1';
+      monthSel.addEventListener('change', () => {
+        _accountLedgerFilterMonth = monthSel.value || '';
+        if (_accountLedgerViewId) renderAccountDetailLedger(_accountLedgerViewId);
+      });
+    }
+  }
+
+  const expandAllBtn = $('#btn-ledger-expand-all');
+  const collapseAllBtn = $('#btn-ledger-collapse-all');
+  if (expandAllBtn && !expandAllBtn.dataset.bound) {
+    expandAllBtn.dataset.bound = '1';
+    expandAllBtn.addEventListener('click', () => {
+      box.querySelectorAll('.ledger-month-group').forEach(g => g.classList.add('expanded'));
+    });
+  }
+  if (collapseAllBtn && !collapseAllBtn.dataset.bound) {
+    collapseAllBtn.dataset.bound = '1';
+    collapseAllBtn.addEventListener('click', () => {
+      box.querySelectorAll('.ledger-month-group').forEach(g => g.classList.remove('expanded'));
+    });
+  }
+
+  const showMonths = _accountLedgerFilterMonth
+    ? months.filter(m => m === _accountLedgerFilterMonth)
+    : months;
+
+  if (!showMonths.length) {
     box.innerHTML = '<div class="ledger-empty">尚無流水紀錄</div>';
     return;
   }
+
   const newest = months[0];
   let html = '';
-  months.forEach((m, idx) => {
+  showMonths.forEach((m, idx) => {
     const items = byMonth[m];
     let netMop = 0;
     let inMop = 0;
@@ -7014,13 +7297,14 @@ function renderAccountDetailLedger(accountId) {
     });
     const [y, mo] = m.split('-');
     const label = `${y}年${Number(mo)}月`;
-    const expanded = m === newest;
+    // 篩選單一月份時預設展開；全部時展開最新月
+    const expanded = _accountLedgerFilterMonth ? true : (m === newest);
     const netCls = netMop > 0.009 ? 'inc' : netMop < -0.009 ? 'exp' : '';
     const netSign = netMop > 0.009 ? '+' : '';
     const statsHtml = `<span class="inc">+${formatMoney(inMop)}</span>
       <span class="exp">−${formatMoney(outMop)}</span>
       <span class="${netCls}">月結餘 ${netSign}${money('MOP', netMop)}</span>`;
-    html += `<div class="day-group ledger-month-group${expanded ? ' expanded' : ''} day-alt-${idx % 2}">
+    html += `<div class="day-group ledger-month-group${expanded ? ' expanded' : ''} day-alt-${idx % 2}" data-month="${m}">
       <button type="button" class="day-group-header">
         <span class="day-group-title"><span class="day-chevron">▾</span> ${label} <span class="account-meta">（${items.length}）</span></span>
         <span class="day-group-stats">${statsHtml}</span>
@@ -7031,6 +7315,13 @@ function renderAccountDetailLedger(accountId) {
     </div>`;
   });
   box.innerHTML = html;
+  // 月份列展開／收合
+  box.querySelectorAll('.ledger-month-group > .day-group-header').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      const g = hdr.closest('.ledger-month-group');
+      if (g) g.classList.toggle('expanded');
+    });
+  });
   bindRecordActions(box);
 }
 
@@ -7619,18 +7910,35 @@ function openEditModal(id) {
   const tb = $(`.type-btn[data-type="${r.type}"]`);
   if (tb) tb.classList.add('active');
 
+  // 自訂分類已在目錄中時直接可選，不必再走「其他」
   populateCategorySelect(r.category);
   const preset = getSelectableCategories().map(c => c.name);
-  if (preset.includes(r.category) && r.category !== '其他') {
+  if (r.category && preset.includes(r.category)) {
     $('#category').value = r.category;
-    $('#custom-category-row').classList.add('hidden');
-  } else if (preset.includes(r.category) && r.category === '其他') {
-    $('#category').value = '其他';
-    $('#custom-category-row').classList.remove('hidden');
+    if (r.category === '其他') {
+      $('#custom-category-row').classList.remove('hidden');
+      if ($('#custom-category')) $('#custom-category').value = '';
+    } else {
+      $('#custom-category-row').classList.add('hidden');
+    }
+  } else if (r.category) {
+    // 罕見：尚未入目錄的舊分類 → 臨時加入並選中
+    if (!categoryCatalog.some(c => c.name === r.category)) {
+      categoryCatalog.push({ id: 'c_' + genId(), name: r.category, icon: '🏷️' });
+      try { saveCategoryCatalog(); refreshCategoryIcons(); } catch (_) {}
+    }
+    populateCategorySelect(r.category);
+    if ([...($('#category')?.options || [])].some(o => o.value === r.category)) {
+      $('#category').value = r.category;
+      $('#custom-category-row').classList.add('hidden');
+    } else {
+      $('#category').value = '其他';
+      $('#custom-category-row').classList.remove('hidden');
+      if ($('#custom-category')) $('#custom-category').value = r.category;
+    }
   } else {
     $('#category').value = '其他';
     $('#custom-category-row').classList.remove('hidden');
-    $('#custom-category').value = r.category;
   }
   onCategoryChange();
   populateAccountSelect(r.viaWalletId || r.accountId || '');
@@ -9448,11 +9756,85 @@ function recordTypeLabelForExport(r) {
   return r.type || '';
 }
 
+/**
+ * 匯出用：是否計入「消費支出／實際支出」
+ * 規則與本月摘要 computeMonthSummary 一致
+ * 回傳 { consumption: '是'|'否', actual: '是'|'否', note: 補充說明 }
+ */
+function recordExpenseFlagsForExport(r) {
+  if (!r) return { consumption: '否', actual: '否', note: '' };
+  // 收入、轉帳、收回、利息、存錢、戶口調整：皆不計支出
+  if (r.type === 'income' || isInterest(r)) return { consumption: '否', actual: '否', note: '收入／利息不計支出' };
+  if (isTransfer(r) && !isCollectReceivable(r)) return { consumption: '否', actual: '否', note: '內部轉帳不計支出' };
+  if (isCollectReceivable(r)) return { consumption: '否', actual: '否', note: '收回應收不計支出' };
+  if (isSavings(r)) return { consumption: '否', actual: '否', note: '存錢不計消費／實際支出（只影響結餘）' };
+  if (isAdjustment(r)) return { consumption: '否', actual: '否', note: '戶口調整不計支出' };
+
+  // 信用卡還款：不計消費支出，計入實際支出
+  if (isRepayment(r)) {
+    return { consumption: '否', actual: '是', note: '還款計實際支出、不計消費支出' };
+  }
+
+  // 代墊：只看自費部分
+  if (isAdvance(r)) {
+    const selfAmt = Number(r.selfAmount) || 0;
+    if (selfAmt <= 0) {
+      return { consumption: '否', actual: '否', note: '代墊無自費（全額應收）' };
+    }
+    const payAcc = findAccountById(r.accountId);
+    const isCc = !!(payAcc && payAcc.type === '信用卡');
+    if (isExcludeConsumption(r)) {
+      // 不計消費：非刷卡仍計實際
+      return {
+        consumption: '否',
+        actual: isCc ? '否' : '是',
+        note: isCc
+          ? '代墊自費＋不計消費＋刷卡（待還款才計實際）'
+          : '代墊自費＋不計消費（非刷卡仍計實際）'
+      };
+    }
+    return {
+      consumption: '是',
+      actual: isCc ? '否' : '是',
+      note: isCc
+        ? '代墊自費＋刷卡（計消費、待還款才計實際）'
+        : '代墊自費（計消費與實際）'
+    };
+  }
+
+  if (r.type !== 'expense') {
+    return { consumption: '否', actual: '否', note: '' };
+  }
+
+  const isCc = isCreditCardPurchase(r);
+  if (isExcludeConsumption(r)) {
+    return {
+      consumption: '否',
+      actual: isCc ? '否' : '是',
+      note: isCc
+        ? '不計消費＋刷卡（待還款才計實際）'
+        : '不計消費（非刷卡仍計實際支出）'
+    };
+  }
+  // 一般支出
+  return {
+    consumption: '是',
+    actual: isCc ? '否' : '是',
+    note: isCc
+      ? '刷卡消費（計消費支出、待還款才計實際支出）'
+      : '一般支出（計消費與實際）'
+  };
+}
+
 function exportRecordsCSV() {
-  const headers = ['日期','類型','分類','金額','貨幣','戶口','備註','特殊標記'];
+  const headers = [
+    '日期', '類型', '分類', '金額', '貨幣', '戶口', '備註',
+    '計入消費支出', '計入實際支出', '計入說明', '特殊標記'
+  ];
   const rows = records.map(r => {
     const acc = accounts.find(a => a.id === (r.displayAccountId || r.accountId));
     const typeLabel = recordTypeLabelForExport(r);
+    const expFlags = recordExpenseFlagsForExport(r);
     const flags = [];
     if (isAdvance(r)) {
       flags.push('代墊');
@@ -9466,6 +9848,7 @@ function exportRecordsCSV() {
     if (isExcludeConsumption(r)) flags.push('不計消費');
     if (isAdjustment(r)) flags.push('戶口調整');
     if (isRepayment(r)) flags.push('信用卡還款');
+    if (isCreditCardPurchase(r)) flags.push('刷卡消費');
     if (r.tags && r.tags.length) flags.push('標籤:' + r.tags.join('/'));
     return [
       r.date,
@@ -9475,6 +9858,9 @@ function exportRecordsCSV() {
       r.currency,
       acc?.name || '',
       r.note || '',
+      expFlags.consumption,
+      expFlags.actual,
+      expFlags.note,
       flags.join('；')
     ];
   });
@@ -9945,6 +10331,11 @@ function init() {
   $('#btn-export').addEventListener('click', () => $('#export-modal-overlay').classList.remove('hidden'));
   $('#btn-close-export').addEventListener('click', () => $('#export-modal-overlay').classList.add('hidden'));
   $('#export-modal-overlay').addEventListener('click', e => { if (e.target.id === 'export-modal-overlay') $('#export-modal-overlay').classList.add('hidden'); });
+  // 摘要／分類明細 modal
+  $('#btn-close-cat-records')?.addEventListener('click', closeCatRecordsModal);
+  $('#cat-records-modal-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'cat-records-modal-overlay') closeCatRecordsModal();
+  });
   $('#btn-csv-records').addEventListener('click', exportRecordsCSV);
   $('#btn-csv-accounts').addEventListener('click', exportAccountsCSV);
   $('#btn-csv-mpf').addEventListener('click', exportMpfCSV);
