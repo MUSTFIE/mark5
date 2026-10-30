@@ -2380,7 +2380,23 @@ form { padding: 16px 20px 24px; }
  <button type="button" id="btn-close-export" class="btn-icon">×</button>
  </div>
  <div class="export-body">
- <p class="rates-hint">選擇要匯出的內容</p>
+ <p class="rates-hint">記帳 CSV 選項</p>
+ <div class="form-row">
+ <label for="export-month">月份</label>
+ <select id="export-month">
+ <option value="">全部月份</option>
+ </select>
+ </div>
+ <div class="form-row">
+ <label for="export-expense-filter">支出篩選</label>
+ <select id="export-expense-filter">
+ <option value="">全部紀錄</option>
+ <option value="consumption">僅計入消費支出</option>
+ <option value="actual">僅計入實際支出</option>
+ <option value="either">計入消費或實際支出</option>
+ </select>
+ </div>
+ <p class="field-hint" style="margin:-6px 0 10px">「消費支出」含刷卡消費；「實際支出」含還款與非刷卡支出（不含純刷卡待還款）。折合MOP 依目前匯率計算。</p>
  <button type="button" class="btn export-btn" id="btn-csv-records">📄 導出記帳 CSV</button>
  <button type="button" class="btn export-btn" id="btn-csv-accounts">🏦 導出戶口 CSV</button>
  <button type="button" class="btn export-btn" id="btn-csv-mpf">🏛️ 導出強積金 CSV</button>
@@ -6457,21 +6473,26 @@ function renderYearly() {
 
   const listEl = $('#yearly-months-list');
   let rows = '';
-  let sumInc = 0, sumExp = 0, sumSav = 0, sumActual = 0;
+  let sumInc = 0, sumExp = 0, sumSav = 0, sumActual = 0, sumDeposit = 0;
+  const MONTHLY_SAVE_BASE = 10000; // 每月存款基準
   for (let m = 0; m < 12; m++) {
     if (!monthsInc[m] && !monthsExp[m] && !monthsSav[m] && !monthsActual[m]) continue;
     // 結餘＝收入 − 實際支出 − 存錢（實際支出＝非刷卡支出＋還款）；表上不顯示存錢欄
     const bal = monthsInc[m] - monthsActual[m] - monthsSav[m];
+    const deposit = bal + MONTHLY_SAVE_BASE; // 存款 = 結餘 + 10000
     const balCls = bal > 0 ? 'positive' : bal < 0 ? 'negative' : '';
+    const depCls = deposit > 0 ? 'inc' : deposit < 0 ? 'exp' : '';
     sumInc += monthsInc[m];
     sumExp += monthsExp[m];
     sumSav += monthsSav[m];
     sumActual += monthsActual[m];
+    sumDeposit += deposit;
     rows += `<tr>
       <td><span class="month-full">${currentYear}年${m + 1}月</span><span class="month-short">${m + 1}月</span></td>
       <td class="inc">＋${formatMoney(monthsInc[m])}</td>
       <td class="exp">−${formatMoney(monthsExp[m])}</td>
       <td class="bal ${balCls}">${formatMoney(bal)}</td>
+      <td class="${depCls}">${formatMoney(deposit)}</td>
     </tr>`;
   }
   if (!rows) {
@@ -6479,14 +6500,16 @@ function renderYearly() {
   } else {
     const totalBal = sumInc - sumActual - sumSav;
     const totalBalCls = totalBal > 0 ? 'positive' : totalBal < 0 ? 'negative' : '';
+    const totalDepCls = sumDeposit > 0 ? 'inc' : sumDeposit < 0 ? 'exp' : '';
     rows += `<tr class="month-table-total">
       <td>總計</td>
       <td class="inc">＋${formatMoney(sumInc)}</td>
       <td class="exp">−${formatMoney(sumExp)}</td>
       <td class="bal ${totalBalCls}">${formatMoney(totalBal)}</td>
+      <td class="${totalDepCls}">${formatMoney(sumDeposit)}</td>
     </tr>`;
     listEl.innerHTML = `<div class="table-wrap"><table class="month-table">
-      <thead><tr><th>月份</th><th>收入</th><th>消費支出</th><th>結餘</th></tr></thead>
+      <thead><tr><th>月份</th><th>收入</th><th>消費支出</th><th>結餘</th><th>存款</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   }
@@ -9525,15 +9548,70 @@ function recordExpenseFlagsForExport(r) {
   };
 }
 
+/** 填入匯出月份選單（有資料的 YYYY-MM） */
+function populateExportMonthSelect() {
+  const sel = $('#export-month');
+  if (!sel) return;
+  const months = new Set();
+  (records || []).forEach(r => {
+    const d = String(r.date || '').slice(0, 7);
+    if (/^\d{4}-\d{2}$/.test(d)) months.add(d);
+  });
+  const sorted = [...months].sort((a, b) => b.localeCompare(a));
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">全部月份</option>';
+  sorted.forEach(ym => {
+    const [y, m] = ym.split('-');
+    const o = document.createElement('option');
+    o.value = ym;
+    o.textContent = `${y}年${Number(m)}月`;
+    sel.appendChild(o);
+  });
+  // 預設目前瀏覽月份（若有資料）
+  const curYm = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+  if (sorted.includes(curYm)) sel.value = curYm;
+  else if (prev && sorted.includes(prev)) sel.value = prev;
+  else sel.value = '';
+}
+
+function openExportModal() {
+  populateExportMonthSelect();
+  $('#export-modal-overlay').classList.remove('hidden');
+}
+
 function exportRecordsCSV() {
+  const monthFilter = ($('#export-month')?.value || '').trim(); // '' or YYYY-MM
+  const expenseFilter = ($('#export-expense-filter')?.value || '').trim(); // '' | consumption | actual | either
+
   const headers = [
-    '日期', '類型', '分類', '金額', '貨幣', '戶口', '備註',
+    '日期', '類型', '分類', '金額', '貨幣', '折合MOP', '戶口', '備註',
     '計入消費支出', '計入實際支出', '計入說明', '特殊標記'
   ];
-  const rows = records.map(r => {
+  let list = records.slice();
+  if (monthFilter) {
+    list = list.filter(r => String(r.date || '').slice(0, 7) === monthFilter);
+  }
+  if (expenseFilter) {
+    list = list.filter(r => {
+      const flags = recordExpenseFlagsForExport(r);
+      if (expenseFilter === 'consumption') return flags.consumption === '是';
+      if (expenseFilter === 'actual') return flags.actual === '是';
+      if (expenseFilter === 'either') return flags.consumption === '是' || flags.actual === '是';
+      return true;
+    });
+  }
+  // 依日期新到舊、同日再依 id
+  list.sort((a, b) => {
+    const da = String(b.date || '').localeCompare(String(a.date || ''));
+    if (da !== 0) return da;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+
+  const rows = list.map(r => {
     const acc = accounts.find(a => a.id === (r.displayAccountId || r.accountId));
     const typeLabel = recordTypeLabelForExport(r);
     const expFlags = recordExpenseFlagsForExport(r);
+    const mopAmt = Math.round(toMOP(r.amount, r.currency) * 100) / 100;
     const flags = [];
     if (isAdvance(r)) {
       flags.push('代墊');
@@ -9555,6 +9633,7 @@ function exportRecordsCSV() {
       r.category,
       r.amount,
       r.currency,
+      mopAmt,
       acc?.name || '',
       r.note || '',
       expFlags.consumption,
@@ -9564,8 +9643,11 @@ function exportRecordsCSV() {
     ];
   });
   const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
-  downloadFile(`記帳紀錄_${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+  const monthTag = monthFilter ? `_${monthFilter}` : '';
+  const filterTag = expenseFilter ? `_${expenseFilter}` : '';
+  downloadFile(`記帳紀錄${monthTag}${filterTag}_${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
   $('#export-modal-overlay').classList.add('hidden');
+  toast(`已匯出 ${rows.length} 筆紀錄`, 'ok');
 }
 
 function exportAccountsCSV() {
@@ -9844,7 +9926,7 @@ function init() {
   $('#btn-settings-monthly')?.addEventListener('click', openMonthlySettings);
   $('#btn-close-settings-monthly')?.addEventListener('click', closeMonthlySettings);
   $('#settings-monthly-overlay')?.addEventListener('click', e => { if (e.target.id === 'settings-monthly-overlay') closeMonthlySettings(); });
-  $('#btn-settings-export')?.addEventListener('click', () => { closeMonthlySettings(); $('#export-modal-overlay').classList.remove('hidden'); });
+  $('#btn-settings-export')?.addEventListener('click', () => { closeMonthlySettings(); openExportModal(); });
   $('#btn-settings-rates')?.addEventListener('click', () => { closeMonthlySettings(); openRatesModal(); });
   $('#btn-settings-templates')?.addEventListener('click', () => { closeMonthlySettings(); openTemplatesModal(); });
   $('#btn-settings-categories')?.addEventListener('click', () => { closeMonthlySettings(); openCategoriesModal(); });
@@ -10027,7 +10109,7 @@ function init() {
   }
 
   // export
-  $('#btn-export').addEventListener('click', () => $('#export-modal-overlay').classList.remove('hidden'));
+  $('#btn-export').addEventListener('click', openExportModal);
   $('#btn-close-export').addEventListener('click', () => $('#export-modal-overlay').classList.add('hidden'));
   $('#export-modal-overlay').addEventListener('click', e => { if (e.target.id === 'export-modal-overlay') $('#export-modal-overlay').classList.add('hidden'); });
   // 摘要／分類明細 modal
